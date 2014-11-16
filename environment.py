@@ -2,6 +2,7 @@ import pygame
 import random
 from threading import *
 import time
+import sys
 
 # Define some colors
 BLACK    = (   0,   0,   0)
@@ -36,7 +37,7 @@ class Habitat(Thread):
 		for id in range(20):
 			x = random.randrange(screensize[0])
 			y = random.randrange(screensize[1])
-			organism = Organism(id, 0, x, y, self)
+			organism = Organism(id, 0, x, y, 10, self)
 			organism.start()
 			# organism.body.add(self.organisms)
 			self.organisms.append(organism)
@@ -44,6 +45,9 @@ class Habitat(Thread):
 	def run(self):
 		while True:
 			# grow food and shit
+			if self.organisms == []:
+				print("mass extinction")
+				break
 			pass
 
 class OrganismBody(pygame.sprite.Sprite):
@@ -54,7 +58,7 @@ class OrganismBody(pygame.sprite.Sprite):
 		self.rect = self.image.get_rect()
 
 class Organism(Thread):
-	def __init__(self, id, generation, initX, initY, habitat):
+	def __init__(self, id, generation, initX, initY, maxHealth, habitat):
 		Thread.__init__(self)
 		self.color = BLACK
 		self.sizeX = 10
@@ -67,15 +71,16 @@ class Organism(Thread):
 		self.velY = 1
 		self.habitat = habitat
 		self.body = OrganismBody(self.color, self.sizeX, self.sizeY)
-		# self.health = maxHealth
+		self.health = maxHealth
 		# self.brain = Brain()
 
 	def update(self):
-		global orgLock
 		# update health
-		# self.health -= 1
+		self.health -= 0.01
+		if self.health <= 0:
+			return False # dead
+
 		# update position
-		# Bounce the rectangle if needed
 		self.posX += self.velX
 		self.posY += self.velY
 
@@ -116,8 +121,16 @@ class Organism(Thread):
 		while True:
 			time.sleep(.01)
 			with orgLock:
-				if not self.update():
-					break # death
+				if not self.update(): # death
+					try:
+						self.habitat.organisms.remove(self)
+						print("organisms list with %d removed:" % self.id)
+						for org in self.habitat.organisms:
+							print("%d, " % org.id)
+					except:
+						print("attempted to remove non-existant organism")
+						break
+					break
 
 habitat = Habitat()
 habitat.start()
