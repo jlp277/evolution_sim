@@ -1,13 +1,3 @@
-"""
- Show how to use a sprite backed by a graphic.
- 
- Sample Python/Pygame Programs
- Simpson College Computer Science
- http://programarcadegames.com/
- http://simpson.edu/computer-science/
- 
- Explanation video: http://youtu.be/vRB_983kUMc
-"""
 import pygame
 import random
 from threading import *
