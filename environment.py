@@ -31,16 +31,16 @@ habLock = Lock()
 habCond = Condition(habLock)
 
 orgSize = 5
-vegSize = 10
+vegSize = 15
 initOrgPop = 20
 initVegPop = 50
 initOrgHealth = 100.0
-naturalHealthDec = 1
-naturalQuantityDec = 1
-initVegQuantity = 10.0
+naturalHealthDec = 0.5
+naturalQuantityDec = 0.5
+initVegQuantity = 50.0
 vegId = 0
 orgId = 0
-healthFromVeg = 2
+healthFromVeg = 10
 nature = ["pred", "prey"]
 
 class Habitat(Thread):
@@ -111,7 +111,7 @@ class VegBody(pygame.sprite.Sprite):
 		self.rect = self.image.get_rect()
 
 class Veg(Thread):
-	def __init__(self, id, initX, initY, quantity, habitat):
+	def __init__(self, id, initX, initY, maxQuantity, habitat):
 		Thread.__init__(self)
 		self.color = GREEN
 		self.sizeX = vegSize
@@ -123,20 +123,26 @@ class Veg(Thread):
 		self.body = VegBody(self.sizeX, self.sizeY)
 		self.body.rect.y = self.posY
 		self.body.rect.x = self.posX
-		self.quantity = quantity
+		self.maxQuantity = maxQuantity
+		self.quantity = maxQuantity
 		self.eaten = 0
+
+	def getQuantityColor(self):
+		quantityFraction = self.quantity / self.maxQuantity
+		levels = 1 - quantityFraction
+		return (int(round(255 * levels)), 255, int(round(255 * levels)))
 
 	def update(self):
 		self.quantity -= naturalQuantityDec + self.eaten
 		self.eaten = 0
-		self.color = (255 - (255 * (self.quantity/initVegQuantity)), 255, 255 - (255 * (self.quantity/initVegQuantity)))
+		self.color = self.getQuantityColor()
 		if self.quantity <= 0:
 			return False # dead
 		return True
 
 	def run(self):
 		while True:
-			time.sleep(2)
+			time.sleep(0.5)
 			with habLock:
 				if not self.update(): # death
 					try:
@@ -213,8 +219,6 @@ class Organism(Thread):
 	def update(self):
 
 		# update health
-		if self.health > self.maxHealth:
-			self.health = self.maxHealth
 		self.health -= naturalHealthDec + self.damageTaken
 		self.damageTaken = 0
 		self.color = self.getHealthColor()
@@ -222,7 +226,7 @@ class Organism(Thread):
 			return False # dead
 
 		self.age += 1
-		
+
 		""" ** UPDATE SPRITE AFTER WHENEVER POS IS UPDATED ** """
 		# update position
 		self.posX += self.velX
@@ -256,14 +260,17 @@ class Organism(Thread):
 		self.body.rect.x = self.posX
 
 		# random directions
-		self.velX = random.choice([-1,1]) * random.randrange(10)
-		self.velY = random.choice([-1,1]) * random.randrange(10)
+		if self.age % 5 == 0: # for now, make changing directions based on age
+			self.velX = random.choice([-1,1]) * random.randrange(10)
+			self.velY = random.choice([-1,1]) * random.randrange(10)
 
 		# check for "collision" with food. mmm...
 		for veg in self.habitat.vegs:
 			if pygame.sprite.collide_rect(self.body, veg.body):
 				veg.eaten += 1
 				self.health += healthFromVeg # how to prevent gorging?
+				if self.health > self.maxHealth:
+					self.health = self.maxHealth
 
 		return True
 
@@ -316,7 +323,7 @@ while not done:
 	pygame.display.flip()
  
 	# --- Limit to 10 frames per second
-	clock.tick(30)
+	clock.tick(10)
  
 # Close the window and quit.
 # If you forget this line, the program will 'hang'
