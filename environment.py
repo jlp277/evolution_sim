@@ -9,6 +9,7 @@ BLACK    = (   0,   0,   0)
 WHITE    = ( 255, 255, 255)
 GREEN    = (   0, 255,   0)
 RED      = ( 255,   0,   0)
+BLUE	 = (   0,   0, 255)
  
 pygame.init()
  
@@ -31,26 +32,24 @@ habCond = Condition(habLock)
 
 orgSize = 5
 vegSize = 10
-initPopSize = 20
-initOrgHealth = 10
-naturalHealthDec = 0.1
+initOrgPop = 20
+initVegPop = 50
+initOrgHealth = 100.0
+naturalHealthDec = 1
 naturalQuantityDec = 1
-initVegQuantity = 10
+initVegQuantity = 10.0
 vegId = 0
+orgId = 0
 healthFromVeg = 1
+nature = ["pred", "prey"]
 
 class Habitat(Thread):
 	def __init__(self):
 		Thread.__init__(self)
 		self.organisms = []
 		self.vegs = []
+		OrganismGenerator(self).start()
 		VeggieGenerator(self).start()
-		for id in range(initPopSize):
-			with habLock:
-				(x, y) = self.getUnoccupiedSpace()
-				organism = Organism(id, 0, x, y, initOrgHealth, self)
-				organism.start()
-				self.organisms.append(organism)
 
 	def getUnoccupiedSpace(self): # inefficient
 		while True:
@@ -60,16 +59,19 @@ class Habitat(Thread):
 			tmpBody.rect.x = x
 			tmpBody.rect.y = y
 			siamese = False
-			for org in self.organisms:
-				if pygame.sprite.collide_rect(tmpBody, org.body):
-					siamese = True
-			if siamese == False:
-				return (x, y)
+			with habLock:
+				for org in self.organisms:
+					if pygame.sprite.collide_rect(tmpBody, org.body):
+						siamese = True
+				if siamese == False:
+					return (x, y)
 
 	def run(self):
 		while True:
+			time.sleep(1)
 			if self.organisms == []:
 				print("mass extinction")
+				# would be nice to kill all threads here. only vegs would need to be killed.
 				break
 			pass
 
@@ -77,11 +79,23 @@ class VeggieGenerator(Thread):
 	def __init__(self, habitat):
 		Thread.__init__(self)
 		self.habitat = habitat
+		self.initializeVegPop()
+
+	def initializeVegPop(self):
+		global vegId
+		for i in range(initVegPop):
+			x = random.randrange(screensize[0])
+			y = random.randrange(screensize[1])
+			veg = Veg(vegId, x, y, initVegQuantity, self.habitat)
+			veg.start()
+			with habLock:
+				self.habitat.vegs.append(veg)
+				vegId += 1
 
 	def run(self):
 		global vegId
 		while True:
-			time.sleep(5)
+			time.sleep(1)
 			x = random.randrange(screensize[0])
 			y = random.randrange(screensize[1])
 			veg = Veg(vegId, x, y, initVegQuantity, self.habitat)
@@ -107,13 +121,15 @@ class Veg(Thread):
 		self.posY = initY
 		self.habitat = habitat
 		self.body = VegBody(self.sizeX, self.sizeY)
+		self.body.rect.y = self.posY
+		self.body.rect.x = self.posX
 		self.quantity = quantity
 		self.eaten = 0
 
 	def update(self):
 		self.quantity -= naturalQuantityDec + self.eaten
 		self.eaten = 0
-		self.color = (255 - (255 * ((self.quantity + 0.0)/initVegQuantity)), 255, 255 - (255 * ((self.quantity + 0.0)/initVegQuantity)))
+		self.color = (255 - (255 * (self.quantity/initVegQuantity)), 255, 255 - (255 * (self.quantity/initVegQuantity)))
 		if self.quantity <= 0:
 			return False # dead
 		return True
@@ -125,12 +141,41 @@ class Veg(Thread):
 				if not self.update(): # death
 					try:
 						self.habitat.vegs.remove(self)
-						print("foods list with %d removed:" % self.id)
-						for veg in self.habitat.vegs:
-							print("%d, " % veg.id)
+						# print("foods list with %d removed:" % self.id)
+						# for veg in self.habitat.vegs:
+						# 	print("%d, " % veg.id)
 						break
 					except:
 						print("attempted to remove non-existant veg")
+
+class OrganismGenerator(Thread):
+	def __init__(self, habitat):
+		Thread.__init__(self)
+		self.habitat = habitat
+		self.initializeOrgPop()
+
+	def initializeOrgPop(self):
+		global orgId
+		for i in range(initOrgPop):
+			(x, y) = self.habitat.getUnoccupiedSpace()
+			nat = random.choice(nature)
+			organism = Organism(orgId, 0, x, y, initOrgHealth, nat, self.habitat)
+			organism.start()
+			with habLock:
+				self.habitat.organisms.append(organism)
+				orgId += 1
+
+	def run(self):
+		global orgId
+		while True:
+			time.sleep(5)
+			(x, y) = self.habitat.getUnoccupiedSpace()
+			nat = random.choice(nature)
+			organism = Organism(orgId, 0, x, y, initOrgHealth, nat, self.habitat)
+			organism.start()
+			with habLock:
+				self.habitat.organisms.append(organism)
+				orgId += 1
 
 class OrganismBody(pygame.sprite.Sprite):
 	def __init__(self, width, height):
@@ -139,7 +184,7 @@ class OrganismBody(pygame.sprite.Sprite):
 		self.rect = self.image.get_rect()
 
 class Organism(Thread):
-	def __init__(self, id, generation, initX, initY, maxHealth, habitat):
+	def __init__(self, id, generation, initX, initY, maxHealth, nature, habitat):
 		Thread.__init__(self)
 		self.color = BLACK
 		self.sizeX = orgSize
@@ -152,16 +197,26 @@ class Organism(Thread):
 		self.velY = 1
 		self.habitat = habitat
 		self.body = OrganismBody(self.sizeX, self.sizeY)
+		self.maxHealth = maxHealth
 		self.health = maxHealth
 		self.damageTaken = 0
+		self.nature = nature
+		self.indicatorColor = RED if self.nature == "pred" else BLUE
 		# self.brain = Brain()
+
+	def getHealthColor(self):
+		healthFraction = self.health / self.maxHealth
+		levels = 1 - healthFraction
+		return (int(round(255 * levels)), int(round(255 * levels)), int(round(255 * levels)))
 
 	def update(self):
 
 		# update health
+		if self.health > self.maxHealth:
+			self.health = self.maxHealth
 		self.health -= naturalHealthDec + self.damageTaken
 		self.damageTaken = 0
-		self.color = (255 - (255 * ((self.health + 0.0)/initOrgHealth)), 255 - (255 * ((self.health + 0.0)/initOrgHealth)), 255 - (255 * ((self.health + 0.0)/initOrgHealth)))
+		self.color = self.getHealthColor()
 		if self.health <= 0:
 			return False # dead
 
@@ -198,21 +253,27 @@ class Organism(Thread):
 		self.body.rect.x = self.posX
 
 		# random directions
-		self.velX = random.choice([-1,1]) * random.randrange(3)
-		self.velY = random.choice([-1,1]) * random.randrange(3)
+		self.velX = random.choice([-1,1]) * random.randrange(5)
+		self.velY = random.choice([-1,1]) * random.randrange(5)
+
+		# check for "collision" with food. mmm...
+		for veg in self.habitat.vegs:
+			if pygame.sprite.collide_rect(self.body, veg.body):
+				veg.eaten += 1
+				self.health += healthFromVeg # how to prevent gorging?
 
 		return True
 
 	def run(self):
 		while True:
-			time.sleep(.1) # rest
+			time.sleep(.2) # rest
 			with habLock:
 				if not self.update(): # death
 					try:
 						self.habitat.organisms.remove(self)
-						print("organisms list with %d removed:" % self.id)
-						for org in self.habitat.organisms:
-							print("%d, " % org.id)
+						# print("organisms list with %d removed:" % self.id)
+						# for org in self.habitat.organisms:
+						# 	print("%d, " % org.id)
 						break
 					except:
 						print("attempted to remove non-existant organism")
@@ -237,15 +298,16 @@ while not done:
 	# above this, or they will be erased with this command.
 	screen.fill(WHITE)
 
-	# draw animals
-	with habLock:
-		for org in habitat.organisms:
-			pygame.draw.rect(screen, org.color, [org.posX, org.posY, org.sizeX, org.sizeY])
-
 	# draw food
 	with habLock:
 		for veg in habitat.vegs:
 			pygame.draw.rect(screen, veg.color, [veg.posX, veg.posY, veg.sizeX, veg.sizeY])
+
+	# draw animals
+	with habLock:
+		for org in habitat.organisms:
+			pygame.draw.rect(screen, org.color, [org.posX, org.posY, org.sizeX, org.sizeY])
+			pygame.draw.rect(screen, org.indicatorColor, [org.posX + org.sizeX, org.posY, 2, 2])
 
 	# --- Go ahead and update the screen with what we've drawn.
 	pygame.display.flip()
