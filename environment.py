@@ -40,7 +40,7 @@ naturalQuantityDec = 1
 initVegQuantity = 10.0
 vegId = 0
 orgId = 0
-healthFromVeg = 1
+healthFromVeg = 2
 nature = ["pred", "prey"]
 
 class Habitat(Thread):
@@ -202,6 +202,7 @@ class Organism(Thread):
 		self.damageTaken = 0
 		self.nature = nature
 		self.indicatorColor = RED if self.nature == "pred" else BLUE
+		self.age = 0
 		# self.brain = Brain()
 
 	def getHealthColor(self):
@@ -220,6 +221,8 @@ class Organism(Thread):
 		if self.health <= 0:
 			return False # dead
 
+		self.age += 1
+		
 		""" ** UPDATE SPRITE AFTER WHENEVER POS IS UPDATED ** """
 		# update position
 		self.posX += self.velX
@@ -253,8 +256,8 @@ class Organism(Thread):
 		self.body.rect.x = self.posX
 
 		# random directions
-		self.velX = random.choice([-1,1]) * random.randrange(5)
-		self.velY = random.choice([-1,1]) * random.randrange(5)
+		self.velX = random.choice([-1,1]) * random.randrange(10)
+		self.velY = random.choice([-1,1]) * random.randrange(10)
 
 		# check for "collision" with food. mmm...
 		for veg in self.habitat.vegs:
@@ -313,7 +316,7 @@ while not done:
 	pygame.display.flip()
  
 	# --- Limit to 10 frames per second
-	clock.tick(10)
+	clock.tick(30)
  
 # Close the window and quit.
 # If you forget this line, the program will 'hang'
