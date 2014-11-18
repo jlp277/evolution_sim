@@ -43,6 +43,9 @@ orgId = 0
 healthFromVeg = 10
 nature = ["pred", "prey"]
 
+viewDistanceX = screensize[0]/8
+viewDistanceY = screensize[1]/8
+
 class Habitat(Thread):
 	def __init__(self):
 		Thread.__init__(self)
@@ -55,13 +58,13 @@ class Habitat(Thread):
 		while True:
 			x = random.randrange(screensize[0])
 			y = random.randrange(screensize[1])
-			tmpBody = OrganismBody(orgSize, orgSize)
-			tmpBody.rect.x = x
-			tmpBody.rect.y = y
+			tmp = tmpSprite(orgSize, orgSize)
+			tmp.rect.x = x
+			tmp.rect.y = y
 			siamese = False
 			with habLock:
 				for org in self.organisms:
-					if pygame.sprite.collide_rect(tmpBody, org.body):
+					if pygame.sprite.collide_rect(tmp, org):
 						siamese = True
 				if siamese == False:
 					return (x, y)
@@ -74,6 +77,11 @@ class Habitat(Thread):
 				# would be nice to kill all threads here. only vegs would need to be killed.
 				break
 			pass
+
+class tmpSprite(pygame.sprite.Sprite):
+	def __init__(self, width, height):
+		super().__init__() # sprite constructor
+		self.rect = pygame.Surface([width, height]).get_rect()
 
 class VeggieGenerator(Thread):
 	def __init__(self, habitat):
@@ -104,28 +112,20 @@ class VeggieGenerator(Thread):
 				self.habitat.vegs.append(veg)
 				vegId += 1
 
-class VegBody(pygame.sprite.Sprite):
-	def __init__(self, width, height):
-		super().__init__() # sprite constructor
-		self.image = pygame.Surface([width, height])
-		self.rect = self.image.get_rect()
-
-class Veg(Thread):
+class Veg(pygame.sprite.Sprite, Thread):
 	def __init__(self, id, initX, initY, maxQuantity, habitat):
 		Thread.__init__(self)
 		self.color = GREEN
-		self.sizeX = vegSize
-		self.sizeY = vegSize
 		self.id = id
-		self.posX = initX
-		self.posY = initY
 		self.habitat = habitat
-		self.body = VegBody(self.sizeX, self.sizeY)
-		self.body.rect.y = self.posY
-		self.body.rect.x = self.posX
 		self.maxQuantity = maxQuantity
 		self.quantity = maxQuantity
 		self.eaten = 0
+
+		super().__init__() # sprite constructor
+		self.rect = pygame.Surface([vegSize, vegSize]).get_rect()
+		self.rect.x = initX
+		self.rect.y = initY
 
 	def getQuantityColor(self):
 		quantityFraction = self.quantity / self.maxQuantity
@@ -147,9 +147,6 @@ class Veg(Thread):
 				if not self.update(): # death
 					try:
 						self.habitat.vegs.remove(self)
-						# print("foods list with %d removed:" % self.id)
-						# for veg in self.habitat.vegs:
-						# 	print("%d, " % veg.id)
 						break
 					except:
 						print("attempted to remove non-existant veg")
@@ -183,33 +180,36 @@ class OrganismGenerator(Thread):
 				self.habitat.organisms.append(organism)
 				orgId += 1
 
-class OrganismBody(pygame.sprite.Sprite):
-	def __init__(self, width, height):
-		super().__init__() # sprite constructor
+class Eye(pygame.sprite.Sprite):
+	def __init_(self, width, height):
+		super().__init__()
 		self.image = pygame.Surface([width, height])
 		self.rect = self.image.get_rect()
 
-class Organism(Thread):
+class Organism(pygame.sprite.Sprite, Thread):
 	def __init__(self, id, generation, initX, initY, maxHealth, nature, habitat):
 		Thread.__init__(self)
+		super().__init__()
 		self.color = BLACK
-		self.sizeX = orgSize
-		self.sizeY = orgSize
 		self.generation = generation
 		self.id = id
-		self.posX = initX
-		self.posY = initY
+		self.orientation = 0 # polar
 		self.velX = 1
 		self.velY = 1
 		self.habitat = habitat
-		self.body = OrganismBody(self.sizeX, self.sizeY)
 		self.maxHealth = maxHealth
 		self.health = maxHealth
 		self.damageTaken = 0
 		self.nature = nature
 		self.indicatorColor = RED if self.nature == "pred" else BLUE
 		self.age = 0
+		# self.leftEye = Eye(viewDistanceX, viewDistanceY)
+		# self.rightEye = Eye(viewDistanceX, viewDistanceY)
 		# self.brain = Brain()
+
+		self.rect = pygame.Surface([orgSize, orgSize]).get_rect()
+		self.rect.x = initX
+		self.rect.y = initY
 
 	def getHealthColor(self):
 		healthFraction = self.health / self.maxHealth
@@ -229,35 +229,27 @@ class Organism(Thread):
 
 		""" ** UPDATE SPRITE AFTER WHENEVER POS IS UPDATED ** """
 		# update position
-		self.posX += self.velX
-		self.posY += self.velY
+		self.rect.x += self.velX
+		self.rect.y += self.velY
 
 		# check collisions
-		if self.posY > screensize[1]:
-			self.posY = screensize[1]
-		elif self.posY < 0:
-			self.posY = 0
-		if self.posX > screensize[0]:
-			self.posY = screensize[0]
-		elif self.posX < 0:
-			self.posX = 0
-
-		# update sprite
-		self.body.rect.y = self.posY
-		self.body.rect.x = self.posX
+		if self.rect.y > screensize[1]:
+			self.rect.y = screensize[1]
+		elif self.rect.y < 0:
+			self.rect.y = 0
+		if self.rect.x > screensize[0]:
+			self.rect.x = screensize[0]
+		elif self.rect.x < 0:
+			self.rect.x = 0
 
 		# check for collision(s) with others. inefficient?
 		for org in self.habitat.organisms:
 			if org == self:
 				continue
-			if pygame.sprite.collide_rect(self.body, org.body):
+			if pygame.sprite.collide_rect(self, org):
 				# collision. move away for now.
-				self.posX += -1 * self.velX
-				self.posY += -1 * self.velY
-
-		# update sprite
-		self.body.rect.y = self.posY
-		self.body.rect.x = self.posX
+				self.rect.x += -1 * self.velX
+				self.rect.y += -1 * self.velY
 
 		# random directions
 		if self.age % 5 == 0: # for now, make changing directions based on age
@@ -266,7 +258,7 @@ class Organism(Thread):
 
 		# check for "collision" with food. mmm...
 		for veg in self.habitat.vegs:
-			if pygame.sprite.collide_rect(self.body, veg.body):
+			if pygame.sprite.collide_rect(self, veg):
 				veg.eaten += 1
 				self.health += healthFromVeg # how to prevent gorging?
 				if self.health > self.maxHealth:
@@ -281,9 +273,6 @@ class Organism(Thread):
 				if not self.update(): # death
 					try:
 						self.habitat.organisms.remove(self)
-						# print("organisms list with %d removed:" % self.id)
-						# for org in self.habitat.organisms:
-						# 	print("%d, " % org.id)
 						break
 					except:
 						print("attempted to remove non-existant organism")
@@ -311,13 +300,13 @@ while not done:
 	# draw food
 	with habLock:
 		for veg in habitat.vegs:
-			pygame.draw.rect(screen, veg.color, [veg.posX, veg.posY, veg.sizeX, veg.sizeY])
+			pygame.draw.rect(screen, veg.color, [veg.rect.x, veg.rect.y, veg.rect.width, veg.rect.height])
 
 	# draw animals
 	with habLock:
 		for org in habitat.organisms:
-			pygame.draw.rect(screen, org.color, [org.posX, org.posY, org.sizeX, org.sizeY])
-			pygame.draw.rect(screen, org.indicatorColor, [org.posX + org.sizeX, org.posY, 2, 2])
+			pygame.draw.rect(screen, org.color, [org.rect.x, org.rect.y, org.rect.width, org.rect.height])
+			pygame.draw.rect(screen, org.indicatorColor, [org.rect.x + org.rect.width, org.rect.y, 2, 2])
 
 	# --- Go ahead and update the screen with what we've drawn.
 	pygame.display.flip()
