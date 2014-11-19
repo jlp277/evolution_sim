@@ -35,8 +35,8 @@ habCond = Condition(habLock)
 
 orgSize = 5.0
 vegSize = 15.0
-initOrgPop = 1
-initVegPop = 1
+initOrgPop = 20
+initVegPop = 50
 initOrgHealth = 100.0
 naturalHealthDec = 0.5
 naturalQuantityDec = 0.5
@@ -47,9 +47,15 @@ healthFromVeg = 10.0
 nature = ["pred", "prey"]
 eyeDist = 10
 eyeSep = 0.6
+viewDist = 50.0
+eyeMult = 0.5
+eyeSense = 0.0005
 
-viewDistanceX = screensize[0]/8
-viewDistanceY = screensize[1]/8
+def addColors(rgb1, rgb2):
+	r = rgb1[0] + rgb2[0] if rgb1[0] + rgb2[0] <= 255 else 255
+	b = rgb1[1] + rgb2[1] if rgb1[1] + rgb2[1] <= 255 else 255
+	g = rgb1[2] + rgb2[2] if rgb1[2] + rgb2[2] <= 255 else 255
+	return (r, g, b)
 
 class Habitat(Thread):
 	def __init__(self):
@@ -183,12 +189,6 @@ class OrganismGenerator(Thread):
 				self.habitat.organisms.add(organism)
 				orgId += 1
 
-class Eye(pygame.sprite.Sprite):
-	def __init_(self, width, height):
-		super().__init__()
-		self.image = pygame.Surface([width, height])
-		self.rect = self.image.get_rect()
-
 class Organism(pygame.sprite.Sprite, Thread):
 	def __init__(self, id, generation, initX, initY, maxHealth, nature, habitat):
 		Thread.__init__(self)
@@ -212,8 +212,8 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.age = 0
 		self.eyes = None
 		self.orient()
-		self.lEyeInput = 0
-		self.rEyeInput = 0
+		self.leftVision = (0, 0, 0)
+		self.rightVision = (0, 0, 0)
 		self.closestVeg = None
 		self.look()
 		# self.brain = Brain()
@@ -243,7 +243,6 @@ class Organism(pygame.sprite.Sprite, Thread):
 	def move(self):
 		self.orient()
 
-		""" ** UPDATE SPRITE AFTER WHENEVER POS IS UPDATED ** """
 		# update position
 		self.rect.x += self.velX
 		self.rect.y += self.velY
@@ -266,9 +265,20 @@ class Organism(pygame.sprite.Sprite, Thread):
 		minDist = 99999.0
 		for veg in self.habitat.vegs:
 			distToVeg = math.sqrt(math.pow(self.rect.center[0] - veg.rect.center[0], 2) + math.pow(self.rect.center[1] - veg.rect.center[1], 2))
+			# update inputs to brain
+			if distToVeg < viewDist:
+				self.leftVision = addColors(self.leftVision, veg.color)
+
+			# update closest veggie
 			if distToVeg < minDist:
 				minDist = distToVeg
 				self.closestVeg = veg
+
+		# for org in self.habitat.orgs:
+		# 	distToVeg = math.sqrt(math.pow(self.rect.center[0] - veg.rect.center[0], 2) + math.pow(self.rect.center[1] - veg.rect.center[1], 2))
+		# 	# update inputs to brain
+		# 	if distToVeg < viewDist:
+		# 		self.leftVision = addColors(self.leftVision, veg.color)
 
 	def update(self):
 
