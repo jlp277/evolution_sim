@@ -255,11 +255,12 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.velY = self.speed * math.sin(self.orientation)
 
 	def move(self):
-		self.orient()
 
 		# update position
 		self.rect.x += self.velX
 		self.rect.y += self.velY
+
+		self.orient()
 
 		# check collisions
 		if self.rect.y > screensize[1]:
