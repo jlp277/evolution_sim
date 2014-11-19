@@ -51,6 +51,8 @@ viewDist = 100.0
 eyeMult = 1
 eyeSense = 0.00005
 
+generator = None
+
 def addColors(rgb1, rgb2):
 	r = rgb1[0] + rgb2[0] if rgb1[0] + rgb2[0] <= 255 else 255
 	b = rgb1[1] + rgb2[1] if rgb1[1] + rgb2[1] <= 255 else 255
@@ -59,10 +61,12 @@ def addColors(rgb1, rgb2):
 
 class Habitat(Thread):
 	def __init__(self):
+		global generator
 		Thread.__init__(self)
 		self.organisms = pygame.sprite.Group()
 		self.vegs = pygame.sprite.Group()
-		OrganismGenerator(self).start()
+		generator = OrganismGenerator(self)
+		generator.start()
 		VeggieGenerator(self).start()
 
 	def getUnoccupiedSpace(self): # inefficient
@@ -113,13 +117,13 @@ class VeggieGenerator(Thread):
 		global vegId
 		while True:
 			time.sleep(1)
-			# x = random.randrange(screensize[0])
-			# y = random.randrange(screensize[1])
-			# veg = Veg(vegId, x, y, initVegQuantity, self.habitat)
-			# veg.start()
-			# with habLock:
-			# 	self.habitat.vegs.add(veg)
-			# 	vegId += 1
+			x = random.randrange(screensize[0])
+			y = random.randrange(screensize[1])
+			veg = Veg(vegId, x, y, initVegQuantity, self.habitat)
+			veg.start()
+			with habLock:
+				self.habitat.vegs.add(veg)
+				vegId += 1
 
 class Veg(pygame.sprite.Sprite, Thread):
 	def __init__(self, id, initX, initY, maxQuantity, habitat):
@@ -165,6 +169,8 @@ class OrganismGenerator(Thread):
 		Thread.__init__(self)
 		self.habitat = habitat
 		self.initializeOrgPop()
+		self.babyQueue = []
+		self.babyQueueMutex = Lock()
 		
 	def initializeOrgPop(self):
 		global orgId
@@ -177,17 +183,46 @@ class OrganismGenerator(Thread):
 				self.habitat.organisms.add(organism)
 				orgId += 1
 
+	#creates the actual organism given two parents, of the supposed same nature
+	def createBaby(self, parent1, parent2):
+		parent1Genes = parent1.brain.params
+		parent2Genes = parent2.brain.params
+		crossover = random.randint(0,len(parent1Genes) - 1)
+		newGenes = []
+		for i in range(crossover):
+			newGenes.append(parent1Genes[i])
+		for j in range(crossover, len(parent1Genes)):
+			newGenes.append(parent2Genes[j])
+		global ordId
+		baby = Organism(orgId, parent1.generation + 1, parent1.rect.x, parent1.rect.y, initOrgHealth, parent1.nature, self.habitat)
+		return baby
+
+	def addToBeBornBaby(self, parent1, parent2):
+		with self.babyQueueMutex:
+			print ("HAVING SEX")
+			newBaby = self.createBaby(parent1, parent2)
+			self.babyQueue.append(newBaby)
+
 	def run(self):
 		global orgId
 		while True:
 			time.sleep(5)
-			# (x, y) = self.habitat.getUnoccupiedSpace()
-			# nat = random.choice(nature)
-			# organism = Organism(orgId, 0, x, y, initOrgHealth, nat, self.habitat)
-			# organism.start()
-			# with habLock:
-			# 	self.habitat.organisms.add(organism)
-			# 	orgId += 1
+			newBaby = None
+			with self.babyQueueMutex:
+				if len(self.babyQueue) != 0:
+					newBaby = self.babyQueue.pop(0)
+			if not(newBaby is None):
+				with habLock:
+					self.habitat.organisms.add(newBaby)
+					newBaby.start()
+					orgId += 1
+			#(x, y) = self.habitat.getUnoccupiedSpace()
+			#nat = random.choice(nature)
+			#organism = Organism(orgId, 0, x, y, initOrgHealth, nat, self.habitat)
+			#organism.start()
+			#with habLock:
+				#self.habitat.organisms.add(organism)
+				#orgId += 1
 
 class Organism(pygame.sprite.Sprite, Thread):
 	def __init__(self, id, generation, initX, initY, maxHealth, nature, habitat):
@@ -300,6 +335,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 
 	def update(self):
 
+		global generator
 		# update health
 		self.health -= naturalHealthDec + self.damageTaken
 		self.damageTaken = 0
@@ -320,8 +356,10 @@ class Organism(pygame.sprite.Sprite, Thread):
 				continue
 			if pygame.sprite.collide_rect(self, org):
 				# collision. move away for now.
+				generator.addToBeBornBaby(self, org)
 				self.rect.x += -1 * self.velX
 				self.rect.y += -1 * self.velY
+				break
 
 		# check for "collision" with food. mmm...
 		for veg in self.habitat.vegs:
