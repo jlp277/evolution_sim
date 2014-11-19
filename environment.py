@@ -34,7 +34,7 @@ habCond = Condition(habLock)
 
 orgSize = 5.0
 vegSize = 15.0
-initOrgPop = 1
+initOrgPop = 20
 initVegPop = 50
 initOrgHealth = 100.0
 naturalHealthDec = 0.5
@@ -174,13 +174,13 @@ class OrganismGenerator(Thread):
 		global orgId
 		while True:
 			time.sleep(5)
-			# (x, y) = self.habitat.getUnoccupiedSpace()
-			# nat = random.choice(nature)
-			# organism = Organism(orgId, 0, x, y, initOrgHealth, nat, self.habitat)
-			# organism.start()
-			# with habLock:
-			# 	self.habitat.organisms.add(organism)
-			# 	orgId += 1
+			(x, y) = self.habitat.getUnoccupiedSpace()
+			nat = random.choice(nature)
+			organism = Organism(orgId, 0, x, y, initOrgHealth, nat, self.habitat)
+			organism.start()
+			with habLock:
+				self.habitat.organisms.add(organism)
+				orgId += 1
 
 class Eye(pygame.sprite.Sprite):
 	def __init_(self, width, height):
