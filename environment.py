@@ -3,6 +3,7 @@ import random
 from threading import *
 import time
 import sys
+from pybrain.tools.shortcuts import buildNetwork
 
 # Define some colors
 BLACK    = (   0,   0,   0)
@@ -159,6 +160,15 @@ class OrganismGenerator(Thread):
 		Thread.__init__(self)
 		self.habitat = habitat
 		self.initializeOrgPop()
+		self.brain = buildNetwork(5,4,2)
+		numParameter = len(self.brain)
+		initialWeights = []
+		for i in range(numParameter):
+			initialWeights.append(random.uniform(-5.0, 5.0))
+		self.brain._setParameters(initialWeights)
+		initialInputs = [1,0,0,0,1]
+		self.brain.activate(initialInputs)
+
 
 	def initializeOrgPop(self):
 		global orgId
