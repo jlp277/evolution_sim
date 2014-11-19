@@ -3,6 +3,8 @@ import random
 from threading import *
 import time
 import sys
+from pybrain.tools.shortcuts import buildNetwork
+import math
 
 # Define some colors
 BLACK    = (   0,   0,   0)
@@ -30,9 +32,9 @@ clock = pygame.time.Clock()
 habLock = Lock()
 habCond = Condition(habLock)
 
-orgSize = 5
-vegSize = 15
-initOrgPop = 20
+orgSize = 5.0
+vegSize = 15.0
+initOrgPop = 1
 initVegPop = 50
 initOrgHealth = 100.0
 naturalHealthDec = 0.5
@@ -40,8 +42,10 @@ naturalQuantityDec = 0.5
 initVegQuantity = 50.0
 vegId = 0
 orgId = 0
-healthFromVeg = 10
+healthFromVeg = 10.0
 nature = ["pred", "prey"]
+eyeDist = 10
+eyeSep = 0.6
 
 viewDistanceX = screensize[0]/8
 viewDistanceY = screensize[1]/8
@@ -49,8 +53,8 @@ viewDistanceY = screensize[1]/8
 class Habitat(Thread):
 	def __init__(self):
 		Thread.__init__(self)
-		self.organisms = []
-		self.vegs = []
+		self.organisms = pygame.sprite.Group()
+		self.vegs = pygame.sprite.Group()
 		OrganismGenerator(self).start()
 		VeggieGenerator(self).start()
 
@@ -61,20 +65,18 @@ class Habitat(Thread):
 			tmp = tmpSprite(orgSize, orgSize)
 			tmp.rect.x = x
 			tmp.rect.y = y
-			siamese = False
 			with habLock:
-				for org in self.organisms:
-					if pygame.sprite.collide_rect(tmp, org):
-						siamese = True
-				if siamese == False:
+				collisions = pygame.sprite.spritecollide(tmp, self.organisms, False)
+				if collisions == []:
 					return (x, y)
+				else:
+					continue
 
 	def run(self):
 		while True:
 			time.sleep(1)
 			if self.organisms == []:
 				print("mass extinction")
-				# would be nice to kill all threads here. only vegs would need to be killed.
 				break
 			pass
 
@@ -97,7 +99,7 @@ class VeggieGenerator(Thread):
 			veg = Veg(vegId, x, y, initVegQuantity, self.habitat)
 			veg.start()
 			with habLock:
-				self.habitat.vegs.append(veg)
+				self.habitat.vegs.add(veg)
 				vegId += 1
 
 	def run(self):
@@ -109,7 +111,7 @@ class VeggieGenerator(Thread):
 			veg = Veg(vegId, x, y, initVegQuantity, self.habitat)
 			veg.start()
 			with habLock:
-				self.habitat.vegs.append(veg)
+				self.habitat.vegs.add(veg)
 				vegId += 1
 
 class Veg(pygame.sprite.Sprite, Thread):
@@ -165,20 +167,20 @@ class OrganismGenerator(Thread):
 			organism = Organism(orgId, 0, x, y, initOrgHealth, nat, self.habitat)
 			organism.start()
 			with habLock:
-				self.habitat.organisms.append(organism)
+				self.habitat.organisms.add(organism)
 				orgId += 1
 
 	def run(self):
 		global orgId
 		while True:
 			time.sleep(5)
-			(x, y) = self.habitat.getUnoccupiedSpace()
-			nat = random.choice(nature)
-			organism = Organism(orgId, 0, x, y, initOrgHealth, nat, self.habitat)
-			organism.start()
-			with habLock:
-				self.habitat.organisms.append(organism)
-				orgId += 1
+			# (x, y) = self.habitat.getUnoccupiedSpace()
+			# nat = random.choice(nature)
+			# organism = Organism(orgId, 0, x, y, initOrgHealth, nat, self.habitat)
+			# organism.start()
+			# with habLock:
+			# 	self.habitat.organisms.add(organism)
+			# 	orgId += 1
 
 class Eye(pygame.sprite.Sprite):
 	def __init_(self, width, height):
@@ -193,39 +195,53 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.color = BLACK
 		self.generation = generation
 		self.id = id
-		self.orientation = 0 # polar
-		self.velX = 1
-		self.velY = 1
+		self.speed = 2
+		self.velX = 0
+		self.velY = 0
 		self.habitat = habitat
 		self.maxHealth = maxHealth
 		self.health = maxHealth
 		self.damageTaken = 0
 		self.nature = nature
 		self.indicatorColor = RED if self.nature == "pred" else BLUE
-		self.age = 0
-		# self.leftEye = Eye(viewDistanceX, viewDistanceY)
-		# self.rightEye = Eye(viewDistanceX, viewDistanceY)
-		# self.brain = Brain()
-
+		self.orientation = random.uniform(0, 2 * math.pi) # polar
 		self.rect = pygame.Surface([orgSize, orgSize]).get_rect()
 		self.rect.x = initX
 		self.rect.y = initY
+		self.age = 0
+		self.eyes = None
+		self.orient()
+		self.lEyeInput = 0
+		self.rEyeInput = 0
+		# self.brain = Brain()
+		
+	def getCenter(self):
+		return (self.rect.x + orgSize / 2, self.rect.y + orgSize / 2)
 
 	def getHealthColor(self):
 		healthFraction = self.health / self.maxHealth
 		levels = 1 - healthFraction
 		return (int(round(255 * levels)), int(round(255 * levels)), int(round(255 * levels)))
 
-	def update(self):
+	def orient(self):
+		# random for now
+		if self.age % 5 == 0: # for now, make changing directions based on age
+			self.orientation = random.uniform(0, 2 * math.pi)
+			self.speed = random.randrange(5)
+		# body stays stationary and moves in orientation and velocity
+		# calculate position of eyes (two points)
+		(centx, centy) = self.getCenter()
+		leyeX = int(round(centx + eyeDist * math.cos(self.orientation - eyeSep)))
+		leyeY = int(round(centy + eyeDist * math.sin(self.orientation - eyeSep)))
+		reyeX = int(round(centx + eyeDist * math.cos(self.orientation + eyeSep)))
+		reyeY = int(round(centy + eyeDist * math.sin(self.orientation + eyeSep)))
+		self.eyes = ((leyeX, leyeY), (reyeX, reyeY))
 
-		# update health
-		self.health -= naturalHealthDec + self.damageTaken
-		self.damageTaken = 0
-		self.color = self.getHealthColor()
-		if self.health <= 0:
-			return False # dead
+		self.velX = self.speed * math.cos(self.orientation)
+		self.velY = self.speed * math.sin(self.orientation)
 
-		self.age += 1
+	def move(self):
+		self.orient()
 
 		""" ** UPDATE SPRITE AFTER WHENEVER POS IS UPDATED ** """
 		# update position
@@ -242,6 +258,22 @@ class Organism(pygame.sprite.Sprite, Thread):
 		elif self.rect.x < 0:
 			self.rect.x = 0
 
+	def update(self):
+
+		# update health
+		self.health -= naturalHealthDec + self.damageTaken
+		self.damageTaken = 0
+		self.color = self.getHealthColor()
+		if self.health <= 0:
+			return False # dead
+
+		self.age += 1
+
+		# check eyes
+
+		# set orientation involves output from brain
+		self.move()
+
 		# check for collision(s) with others. inefficient?
 		for org in self.habitat.organisms:
 			if org == self:
@@ -250,11 +282,6 @@ class Organism(pygame.sprite.Sprite, Thread):
 				# collision. move away for now.
 				self.rect.x += -1 * self.velX
 				self.rect.y += -1 * self.velY
-
-		# random directions
-		if self.age % 5 == 0: # for now, make changing directions based on age
-			self.velX = random.choice([-1,1]) * random.randrange(10)
-			self.velY = random.choice([-1,1]) * random.randrange(10)
 
 		# check for "collision" with food. mmm...
 		for veg in self.habitat.vegs:
@@ -301,12 +328,13 @@ while not done:
 	with habLock:
 		for veg in habitat.vegs:
 			pygame.draw.rect(screen, veg.color, [veg.rect.x, veg.rect.y, veg.rect.width, veg.rect.height])
-
-	# draw animals
-	with habLock:
 		for org in habitat.organisms:
 			pygame.draw.rect(screen, org.color, [org.rect.x, org.rect.y, org.rect.width, org.rect.height])
 			pygame.draw.rect(screen, org.indicatorColor, [org.rect.x + org.rect.width, org.rect.y, 2, 2])
+			pygame.draw.circle(screen, BLACK, (org.eyes[0][0], org.eyes[0][1]), 2, 1)
+			pygame.draw.lines(screen, BLACK, False, [(int(round(org.getCenter()[0])), int(round(org.getCenter()[1]))), (org.eyes[0][0], org.eyes[0][1])], 1)
+			pygame.draw.circle(screen, BLACK, (org.eyes[1][0], org.eyes[1][1]), 2, 1)
+			pygame.draw.lines(screen, BLACK, False, [(int(round(org.getCenter()[0])), int(round(org.getCenter()[1]))), (org.eyes[1][0], org.eyes[1][1])], 1)
 
 	# --- Go ahead and update the screen with what we've drawn.
 	pygame.display.flip()
