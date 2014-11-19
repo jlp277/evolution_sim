@@ -8,6 +8,7 @@ import math
 
 # Define some colors
 BLACK    = (   0,   0,   0)
+GREY     = (150, 150 , 150 )
 WHITE    = ( 255, 255, 255)
 GREEN    = (   0, 255,   0)
 RED      = ( 255,   0,   0)
@@ -34,8 +35,8 @@ habCond = Condition(habLock)
 
 orgSize = 5.0
 vegSize = 15.0
-initOrgPop = 20
-initVegPop = 50
+initOrgPop = 1
+initVegPop = 1
 initOrgHealth = 100.0
 naturalHealthDec = 0.5
 naturalQuantityDec = 0.5
@@ -213,10 +214,9 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.orient()
 		self.lEyeInput = 0
 		self.rEyeInput = 0
+		self.closestVeg = None
+		self.look()
 		# self.brain = Brain()
-		
-	def getCenter(self):
-		return (self.rect.x + orgSize / 2, self.rect.y + orgSize / 2)
 
 	def getHealthColor(self):
 		healthFraction = self.health / self.maxHealth
@@ -230,7 +230,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 			self.speed = random.randrange(5)
 		# body stays stationary and moves in orientation and velocity
 		# calculate position of eyes (two points)
-		(centx, centy) = self.getCenter()
+		(centx, centy) = self.rect.center
 		leyeX = int(round(centx + eyeDist * math.cos(self.orientation - eyeSep)))
 		leyeY = int(round(centy + eyeDist * math.sin(self.orientation - eyeSep)))
 		reyeX = int(round(centx + eyeDist * math.cos(self.orientation + eyeSep)))
@@ -250,13 +250,25 @@ class Organism(pygame.sprite.Sprite, Thread):
 
 		# check collisions
 		if self.rect.y > screensize[1]:
-			self.rect.y = screensize[1]
-		elif self.rect.y < 0:
 			self.rect.y = 0
+			self.orient()
+		elif self.rect.y < 0:
+			self.rect.y = screensize[1]
+			self.orient()
 		if self.rect.x > screensize[0]:
-			self.rect.x = screensize[0]
-		elif self.rect.x < 0:
 			self.rect.x = 0
+			self.orient()
+		elif self.rect.x < 0:
+			self.rect.x = screensize[0]
+			self.orient()
+
+	def look(self):
+		minDist = 99999.0
+		for veg in self.habitat.vegs:
+			distToVeg = math.sqrt(math.pow(self.rect.center[0] - veg.rect.center[0], 2) + math.pow(self.rect.center[1] - veg.rect.center[1], 2))
+			if distToVeg < minDist:
+				minDist = distToVeg
+				self.closestVeg = veg
 
 	def update(self):
 
@@ -270,7 +282,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.age += 1
 
 		# check eyes
-
+		self.look()
 		# set orientation involves output from brain
 		self.move()
 
@@ -332,9 +344,11 @@ while not done:
 			pygame.draw.rect(screen, org.color, [org.rect.x, org.rect.y, org.rect.width, org.rect.height])
 			pygame.draw.rect(screen, org.indicatorColor, [org.rect.x + org.rect.width, org.rect.y, 2, 2])
 			pygame.draw.circle(screen, BLACK, (org.eyes[0][0], org.eyes[0][1]), 2, 1)
-			pygame.draw.lines(screen, BLACK, False, [(int(round(org.getCenter()[0])), int(round(org.getCenter()[1]))), (org.eyes[0][0], org.eyes[0][1])], 1)
+			pygame.draw.lines(screen, BLACK, False, [org.rect.center, (org.eyes[0][0], org.eyes[0][1])], 1)
 			pygame.draw.circle(screen, BLACK, (org.eyes[1][0], org.eyes[1][1]), 2, 1)
-			pygame.draw.lines(screen, BLACK, False, [(int(round(org.getCenter()[0])), int(round(org.getCenter()[1]))), (org.eyes[1][0], org.eyes[1][1])], 1)
+			pygame.draw.lines(screen, BLACK, False, [org.rect.center, (org.eyes[1][0], org.eyes[1][1])], 1)
+			if org.closestVeg:
+				pygame.draw.lines(screen, GREY, False, [org.rect.center, org.closestVeg.rect.center])
 
 	# --- Go ahead and update the screen with what we've drawn.
 	pygame.display.flip()
