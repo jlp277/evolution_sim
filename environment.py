@@ -35,8 +35,8 @@ habCond = Condition(habLock)
 
 orgSize = 5.0
 vegSize = 15.0
-initOrgPop = 20
-initVegPop = 50
+initOrgPop = 1
+initVegPop = 10
 initOrgHealth = 100.0
 naturalHealthDec = 0.5
 naturalQuantityDec = 0.5
@@ -45,11 +45,11 @@ vegId = 0
 orgId = 0
 healthFromVeg = 10.0
 nature = ["pred", "prey"]
-eyeDist = 10
-eyeSep = 0.6
-viewDist = 50.0
-eyeMult = 0.5
-eyeSense = 0.0005
+eyeDist = 15
+eyeSep = 1
+viewDist = 100.0
+eyeMult = 1
+eyeSense = 0.00005
 
 generator = None
 
@@ -172,7 +172,6 @@ class OrganismGenerator(Thread):
 		self.babyQueue = []
 		self.babyQueueMutex = Lock()
 		
-
 	def initializeOrgPop(self):
 		global orgId
 		for i in range(initOrgPop):
@@ -318,15 +317,19 @@ class Organism(pygame.sprite.Sprite, Thread):
 			distToVeg = math.sqrt(math.pow(self.rect.center[0] - veg.rect.center[0], 2) + math.pow(self.rect.center[1] - veg.rect.center[1], 2))
 			# update inputs to brain
 			if distToVeg < viewDist:
-				self.leftVision = addColors(self.leftVision, veg.color)
-
+				# update sense to left eye (r, g, b)
+				smell = eyeMult * math.exp(-eyeSense * (math.pow(self.eyes[0][0] - veg.rect.center[0],2) + math.pow(self.eyes[0][1] - veg.rect.center[1],2)))
+				self.leftVision = tuple([smell * c for c in veg.color])
+				# update sense to right eye (r, g, b)
+				smell = eyeMult * math.exp(-eyeSense * (math.pow(self.eyes[1][0] - veg.rect.center[0],2) + math.pow(self.eyes[1][1] - veg.rect.center[1],2)))
+				self.rightVision = tuple([smell * c for c in veg.color])
 			# update closest veggie
 			if distToVeg < minDist:
 				minDist = distToVeg
 				self.closestVeg = veg
 
 		# for org in self.habitat.orgs:
-		# 	distToVeg = math.sqrt(math.pow(self.rect.center[0] - veg.rect.center[0], 2) + math.pow(self.rect.center[1] - veg.rect.center[1], 2))
+		# 	distToOrg = math.sqrt(math.pow(self.rect.center[0] - veg.rect.center[0], 2) + math.pow(self.rect.center[1] - veg.rect.center[1], 2))
 		# 	# update inputs to brain
 		# 	if distToVeg < viewDist:
 		# 		self.leftVision = addColors(self.leftVision, veg.color)
@@ -418,12 +421,14 @@ while not done:
 			pygame.draw.lines(screen, BLACK, False, [org.rect.center, (org.eyes[1][0], org.eyes[1][1])], 1)
 			if org.closestVeg:
 				pygame.draw.lines(screen, GREY, False, [org.rect.center, org.closestVeg.rect.center])
+			pygame.draw.rect(screen, org.leftVision, [0, 0, 20, 20])
+			pygame.draw.rect(screen, org.rightVision, [30, 0, 20, 20])
 
 	# --- Go ahead and update the screen with what we've drawn.
 	pygame.display.flip()
  
 	# --- Limit to 10 frames per second
-	clock.tick(5)
+	clock.tick(10)
  
 # Close the window and quit.
 # If you forget this line, the program will 'hang'
