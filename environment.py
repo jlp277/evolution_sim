@@ -194,7 +194,7 @@ class OrganismGenerator(Thread):
 			newGenes.append(parent1Genes[i])
 		for j in range(crossover, len(parent1Genes)):
 			newGenes.append(parent2Genes[j])
-		global ordId
+		global orgId
 		baby = Organism(orgId, parent1.generation + 1, parent1.rect.x, parent1.rect.y, initOrgHealth, parent1.nature, self.habitat)
 		return baby
 
@@ -233,6 +233,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.generation = generation
 		self.id = id
 		self.speed = 2
+		self.iterationsUntilMate = 0
 		self.velX = 0
 		self.velY = 0
 		self.habitat = habitat
@@ -351,12 +352,17 @@ class Organism(pygame.sprite.Sprite, Thread):
 		for org in self.habitat.organisms:
 			if org == self:
 				continue
+
 			if pygame.sprite.collide_rect(self, org):
-				# collision. move away for now.
-				generator.addToBeBornBaby(self, org)
+				# collision.
+				#if collided parents can mate
+				if (self.iterationsUntilMate == 0) and (org.iterationsUntilMate == 0):
+					if random.randint(0,1) == 0:
+						generator.addToBeBornBaby(self, org)
+						self.iterationsUntilMate = 10
+						org.iterationsUntilMate = 10
 				self.rect.x += -1 * self.velX
 				self.rect.y += -1 * self.velY
-				break
 
 		# check for "collision" with food. mmm...
 		for veg in self.habitat.vegs:
