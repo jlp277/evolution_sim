@@ -35,7 +35,7 @@ habCond = Condition(habLock)
 
 orgSize = 5.0
 vegSize = 15.0
-initOrgPop = 1
+initOrgPop = 25
 initVegPop = 50
 initOrgHealth = 100.0
 naturalHealthDec = 0.5
@@ -50,6 +50,8 @@ eyeSep = 1
 viewDist = 50.0
 eyeMult = 1
 eyeSense = 0.0005
+
+mutationPr = 0.03
 
 generator = None
 
@@ -149,7 +151,7 @@ class Veg(pygame.sprite.Sprite, Thread):
 
 	def run(self):
 		while True:
-			time.sleep(0.7)
+			time.sleep(0.25)
 			with habLock:
 				if not self.update(): # death
 					try:
@@ -178,40 +180,42 @@ class OrganismGenerator(Thread):
 
 	#creates the actual organism given two parents, of the supposed same nature
 	def createBaby(self, parent1, parent2):
-		global ordId
+		global orgId
 		parent1Genes = parent1.brain.params
 		parent2Genes = parent2.brain.params
 		crossover = random.randrange(len(parent1Genes))
-		newGenes = parent1Genes[:crossover] + parent2Genes[crossover:]
+		newGenes = parent1Genes.tolist()[:crossover] + parent2Genes.tolist()[crossover:]
 		generation = parent1.generation + 1 if parent1.generation > parent2.generation else parent2.generation + 1
 		baby = Organism(orgId, generation, parent1.rect.x, parent1.rect.y, parent1.maxHealth, parent1.nature, self.habitat)
 		orgId += 1
 		return baby
 
 	def addToBeBornBaby(self, parent1, parent2):
-		with self.babyQueueMutex:
-			newBaby = self.createBaby(parent1, parent2)
-			self.babyQueue.append(newBaby)
+		newBaby = self.createBaby(parent1, parent2)
+		self.babyQueue.append(newBaby)
 
 	def run(self):
 		global orgId
 		while True:
-			time.sleep(5)
+			time.sleep(2)
 			newBaby = None
 			with habLock:
 				if not self.babyQueue == []:
 					newBaby = self.babyQueue.pop(0)
 				if newBaby:
 					self.habitat.organisms.add(newBaby)
-					print(newBaby.generation)
 					newBaby.start()
-			#(x, y) = self.habitat.getUnoccupiedSpace()
-			#nat = random.choice(nature)
-			#organism = Organism(orgId, 0, x, y, initOrgHealth, nat, self.habitat)
-			#organism.start()
-			#with habLock:
-				#self.habitat.organisms.add(organism)
-				#orgId += 1
+
+			if random.uniform(0,1) <= mutationPr:
+				# mutations introduced to population gene pool via new organisms with random brains
+				(x, y) = self.habitat.getUnoccupiedSpace()
+				nat = random.choice(nature)
+				organism = Organism(orgId, 0, x, y, initOrgHealth, nat, self.habitat)
+				organism.start()
+				with habLock:
+					self.habitat.organisms.add(organism)
+					orgId += 1
+					print("mutation! %d" % orgId)
 
 class Organism(pygame.sprite.Sprite, Thread):
 	def __init__(self, id, generation, initX, initY, maxHealth, nature, habitat):
@@ -235,7 +239,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.rect.y = initY
 		self.age = 0
 		self.eyes = None
-		self.brain = buildNetwork(6,4,2)
+		self.brain = buildNetwork(8,4,2)
 		self.leftVision = (0, 0, 0)
 		self.rightVision = (0, 0, 0)
 		self.orient()
@@ -251,21 +255,27 @@ class Organism(pygame.sprite.Sprite, Thread):
 
 	def orient(self):
 		# random for now
-		if self.age % 2 == 0: # for now, make changing directions based on age
-			inputs = []
-			for color in self.leftVision:
-				inputs.append(color)
-			for color in self.rightVision:
-				inputs.append(color)
+		# if self.age % 2 == 0: # for now, make changing directions based on age,
+		inputs = []
+		for color in self.leftVision:
+			inputs.append(color)
+		for color in self.rightVision:
+			inputs.append(color)
+		inputs.extend([1,1]) # bias neurons
+		# print(inputs)
 
-			outputs = self.brain.activate(inputs)
-			print(outputs)
-			if outputs[0] < outputs[1]:
-				self.orientation -= 0.1
-			else:
-				self.orientation += 0.1
-			#self.orientation = random.uniform(0, 2 * math.pi)
-			self.speed = random.uniform(0,2)
+		outputs = self.brain.activate(inputs)
+		lrDiff = outputs[0] - outputs[1]
+
+		if math.fabs(lrDiff) < 0.1:
+			pass
+		elif lrDiff < 0:
+			self.orientation -= 0.05
+		else:
+			self.orientation += 0.05
+
+		#self.orientation = random.uniform(0, 2 * math.pi)
+		self.speed = random.uniform(0,3)
 
 		# body stays stationary and moves in orientation and velocity
 		# calculate position of eyes (two points)
@@ -285,24 +295,23 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.rect.x += self.velX
 		self.rect.y += self.velY
 
+		# wrap around screen
+		if self.rect.y >= screensize[1]:
+			self.rect.y = 1
+		
+		if self.rect.y <= 0:
+			self.rect.y = screensize[1] - 1
+
+		if self.rect.x >= screensize[0]:
+			self.rect.x = 1
+		
+		if self.rect.x <= 0:
+			self.rect.x = screensize[0] - 1
+
 		self.orient()
 
-		# check collisions
-		if self.rect.y > screensize[1]:
-			self.rect.y = 0
-			self.orient()
-		elif self.rect.y < 0:
-			self.rect.y = screensize[1]
-			self.orient()
-		if self.rect.x > screensize[0]:
-			self.rect.x = 0
-			self.orient()
-		elif self.rect.x < 0:
-			self.rect.x = screensize[0]
-			self.orient()
-
 	def look(self):
-		minDist = 99999.0
+		minDist = 9999.0
 		for veg in self.habitat.vegs:
 			distToVeg = math.sqrt(math.pow(self.rect.center[0] - veg.rect.center[0], 2) + math.pow(self.rect.center[1] - veg.rect.center[1], 2))
 			if distToVeg < viewDist:
@@ -356,8 +365,8 @@ class Organism(pygame.sprite.Sprite, Thread):
 				# collision. move away for now.
 				if self.canMate() and self.shouldMate(org):
 					generator.addToBeBornBaby(self, org)
-				self.rect.x += -4 * self.velX
-				self.rect.y += -4 * self.velY
+				self.rect.x += -6 * self.velX
+				self.rect.y += -6 * self.velY
 				break
 
 		# check for "collision" with food. mmm...
@@ -413,8 +422,8 @@ while not done:
 			pygame.draw.lines(screen, BLACK, False, [org.rect.center, (org.eyes[1][0], org.eyes[1][1])], 1)
 			if org.closestVeg:
 				pygame.draw.lines(screen, GREY, False, [org.rect.center, org.closestVeg.rect.center])
-			pygame.draw.rect(screen, org.leftVision, [0, 0, 20, 20])
-			pygame.draw.rect(screen, org.rightVision, [30, 0, 20, 20])
+			# pygame.draw.rect(screen, org.leftVision, [0, 0, 20, 20])
+			# pygame.draw.rect(screen, org.rightVision, [30, 0, 20, 20])
 
 	# --- Go ahead and update the screen with what we've drawn.
 	pygame.display.flip()
