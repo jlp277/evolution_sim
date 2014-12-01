@@ -35,7 +35,7 @@ habCond = Condition(habLock)
 
 orgSize = 5.0
 vegSize = 15.0
-initOrgPop = 1
+initOrgPop = 20
 initVegPop = 10
 initOrgHealth = 100.0
 naturalHealthDec = 0.5
@@ -52,6 +52,7 @@ eyeMult = 1
 eyeSense = 0.00005
 
 generator = None
+oldestAge = 0
 
 def addColors(rgb1, rgb2):
 	r = rgb1[0] + rgb2[0] if rgb1[0] + rgb2[0] <= 255 else 255
@@ -251,6 +252,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.leftVision = (0, 0, 0)
 		self.rightVision = (0, 0, 0)
 		self.orient()
+		self.age = 0
 		
 		self.closestVeg = None
 		self.look()
@@ -260,6 +262,12 @@ class Organism(pygame.sprite.Sprite, Thread):
 		healthFraction = self.health / self.maxHealth
 		levels = 1 - healthFraction
 		return (int(round(255 * levels)), int(round(255 * levels)), int(round(255 * levels)))
+
+	def incrementAge(self):
+		global oldestAge
+		self.age += 1
+		if self.age > oldestAge:
+			oldestAge = self.age
 
 	def orient(self):
 		# random for now
@@ -413,6 +421,7 @@ while not done:
 		for veg in habitat.vegs:
 			pygame.draw.rect(screen, veg.color, [veg.rect.x, veg.rect.y, veg.rect.width, veg.rect.height])
 		for org in habitat.organisms:
+			org.incrementAge()
 			pygame.draw.rect(screen, org.color, [org.rect.x, org.rect.y, org.rect.width, org.rect.height])
 			pygame.draw.rect(screen, org.indicatorColor, [org.rect.x + org.rect.width, org.rect.y, 2, 2])
 			pygame.draw.circle(screen, BLACK, (org.eyes[0][0], org.eyes[0][1]), 2, 1)
