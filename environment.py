@@ -35,11 +35,7 @@ habCond = Condition(habLock)
 
 orgSize = 5.0
 vegSize = 15.0
-<<<<<<< HEAD
-initOrgPop = 50
-=======
 initOrgPop = 20
->>>>>>> Added vision of other orgs. Enable predator eating prey.
 initVegPop = 50
 initOrgHealth = 100.0
 naturalHealthDec = 0.5
