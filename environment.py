@@ -362,11 +362,8 @@ class Organism(pygame.sprite.Sprite, Thread):
 				smell = eyeMult * math.exp(-eyeSense * (math.pow(self.eyes[1][0] - org.rect.center[0],2) + math.pow(self.eyes[1][1] - org.rect.center[1],2)))
 				rv = [rv[0] + smell * org.indicatorColor[0], rv[1] + smell * org.indicatorColor[1], rv[2] + smell * org.indicatorColor[2]]
 
-		# totalObjects = len(self.habitat.organisms) + len(self.habitat.vegs) + 0.00001
-		# self.leftVision = tuple([signal / totalObjects for signal in lv])
-		# self.rightVision = tuple([signal / totalObjects for signal in rv])
-		self.leftVision = tuple([round(signal) for signal in lv])
-		self.rightVision = tuple([round(signal) for signal in rv])
+		self.leftVision = tuple([signal for signal in lv])
+		self.rightVision = tuple([signal for signal in rv])
 
 	def canEat(self, org):
 		natureOK = org.nature == "prey" and self.nature == "pred"
@@ -487,7 +484,7 @@ while not done:
 	pygame.display.flip()
  
 	# --- Limit to 10 frames per second
-	clock.tick(10)
+	clock.tick(20)
  
 # Close the window and quit.
 # If you forget this line, the program will 'hang'
