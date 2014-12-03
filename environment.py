@@ -35,7 +35,11 @@ habCond = Condition(habLock)
 
 orgSize = 5.0
 vegSize = 15.0
+<<<<<<< HEAD
 initOrgPop = 50
+=======
+initOrgPop = 20
+>>>>>>> Added vision of other orgs. Enable predator eating prey.
 initVegPop = 50
 initOrgHealth = 100.0
 naturalHealthDec = 0.5
@@ -43,12 +47,14 @@ naturalQuantityDec = 0.5
 initVegQuantity = 50.0
 vegId = 0
 orgId = 0
-healthFromVeg = 10.0
+preyHealthFromVeg = 10.0
+predHealthFromVeg = 2.0
+healthFromPrey = 100.0
 nature = ["pred", "prey"]
 eyeDist = 15
 eyeSep = 1
 viewDist = 50.0
-eyeMult = 1
+eyeMult = 1.5
 eyeSense = 0.0005
 
 mutationPr = 0.03
@@ -250,6 +256,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.brain = buildNetwork(8,4,2)
 		self.leftVision = (0, 0, 0)
 		self.rightVision = (0, 0, 0)
+		self.friendsNear = 0
 		self.orient()
 		self.age = 0
 		
@@ -326,24 +333,47 @@ class Organism(pygame.sprite.Sprite, Thread):
 
 	def look(self):
 		minDist = 9999.0
+		lv = [0,0,0]
+		rv = [0,0,0]
+		self.friendsNear = 0
 		for veg in self.habitat.vegs:
 			distToVeg = math.sqrt(math.pow(self.rect.center[0] - veg.rect.center[0], 2) + math.pow(self.rect.center[1] - veg.rect.center[1], 2))
 			if distToVeg < viewDist:
 				smell = eyeMult * math.exp(-eyeSense * (math.pow(self.eyes[0][0] - veg.rect.center[0],2) + math.pow(self.eyes[0][1] - veg.rect.center[1],2)))
-				self.leftVision = tuple([smell * c for c in veg.color])
+				lv = [lv[0] + smell * veg.color[0], lv[1] + smell * veg.color[1], lv[2] + smell * veg.color[2]]
 				smell = eyeMult * math.exp(-eyeSense * (math.pow(self.eyes[1][0] - veg.rect.center[0],2) + math.pow(self.eyes[1][1] - veg.rect.center[1],2)))
-				self.rightVision = tuple([smell * c for c in veg.color])
+				rv = [rv[0] + smell * veg.color[0], rv[1] + smell * veg.color[1], rv[2] + smell * veg.color[2]]
 
 			# update closest veggie
 			if distToVeg < minDist:
 				minDist = distToVeg
 				self.closestVeg = veg
 
-		# for org in self.habitat.orgs:
-		# 	distToOrg = math.sqrt(math.pow(self.rect.center[0] - veg.rect.center[0], 2) + math.pow(self.rect.center[1] - veg.rect.center[1], 2))
-		# 	# update inputs to brain
-		# 	if distToVeg < viewDist:
-		# 		self.leftVision = addColors(self.leftVision, veg.color)
+		for org in self.habitat.organisms:
+			if org == self:
+				continue
+			distToOrg = math.sqrt(math.pow(self.rect.center[0] - org.rect.center[0], 2) + math.pow(self.rect.center[1] - org.rect.center[1], 2))
+			# update inputs to brain
+			if distToOrg < viewDist:
+				if org.nature == self.nature:
+					self.friendsNear += 1
+				smell = eyeMult * math.exp(-eyeSense * (math.pow(self.eyes[0][0] - org.rect.center[0],2) + math.pow(self.eyes[0][1] - org.rect.center[1],2)))
+				lv = [lv[0] + smell * org.indicatorColor[0], lv[1] + smell * org.indicatorColor[1], lv[2] + smell * org.indicatorColor[2]]
+				smell = eyeMult * math.exp(-eyeSense * (math.pow(self.eyes[1][0] - org.rect.center[0],2) + math.pow(self.eyes[1][1] - org.rect.center[1],2)))
+				rv = [rv[0] + smell * org.indicatorColor[0], rv[1] + smell * org.indicatorColor[1], rv[2] + smell * org.indicatorColor[2]]
+
+		# totalObjects = len(self.habitat.organisms) + len(self.habitat.vegs) + 0.00001
+		# self.leftVision = tuple([signal / totalObjects for signal in lv])
+		# self.rightVision = tuple([signal / totalObjects for signal in rv])
+		self.leftVision = tuple([round(signal) for signal in lv])
+		self.rightVision = tuple([round(signal) for signal in rv])
+
+	def canEat(self, org):
+		natureOK = org.nature == "prey" and self.nature == "pred"
+		return natureOK
+
+	def healthGained(self, org):
+		return org.health * (self.friendsNear if not self.friendsNear == 0 else 1) / (org.friendsNear if not org.friendsNear == 0 else 2)
 
 	def canMate(self):
 		print("can mate?" + str(self.health/self.maxHealth))
@@ -381,7 +411,12 @@ class Organism(pygame.sprite.Sprite, Thread):
 
 			if pygame.sprite.collide_rect(self, org):
 				# collision. move away for now.
-				print("these are their ages " + str(self.age) + " " + str(org.age))
+				if self.canEat(org):
+					healthTrans = self.healthGained(org)
+					org.damageTaken += healthTrans
+					self.health += healthTrans
+					if self.health > self.maxHealth:
+						self.health = self.maxHealth
 				if self.canMate() and self.shouldMate(org):
 					print("mating" + str(self.id) + " " + str(org.id))
 					generator.addToBeBornBaby(self, org)
@@ -393,7 +428,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 		for veg in self.habitat.vegs:
 			if pygame.sprite.collide_rect(self, veg):
 				veg.eaten += 1
-				self.health += healthFromVeg # how to prevent gorging?
+				self.health += preyHealthFromVeg if self.nature == "prey" else predHealthFromVeg# how to prevent gorging?
 				if self.health > self.maxHealth:
 					self.health = self.maxHealth
 		return True
@@ -443,14 +478,16 @@ while not done:
 			pygame.draw.lines(screen, BLACK, False, [org.rect.center, (org.eyes[1][0], org.eyes[1][1])], 1)
 			if org.closestVeg:
 				pygame.draw.lines(screen, GREY, False, [org.rect.center, org.closestVeg.rect.center])
-			# pygame.draw.rect(screen, org.leftVision, [0, 0, 20, 20])
-			# pygame.draw.rect(screen, org.rightVision, [30, 0, 20, 20])
+			# if org.id == 1:
+			# 	pygame.draw.rect(screen, GREEN, [org.rect.x + org.rect.width, org.rect.y + org.rect.height, 2, 2])
+			# 	pygame.draw.rect(screen, org.leftVision, [0, 0, 20, 20])
+			# 	pygame.draw.rect(screen, org.rightVision, [30, 0, 20, 20])
 
 	# --- Go ahead and update the screen with what we've drawn.
 	pygame.display.flip()
  
 	# --- Limit to 10 frames per second
-	clock.tick(20)
+	clock.tick(10)
  
 # Close the window and quit.
 # If you forget this line, the program will 'hang'
