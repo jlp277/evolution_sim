@@ -353,7 +353,8 @@ class Organism(pygame.sprite.Sprite, Thread):
 	def shouldMate(self, org):
 		print("shouldMate?" + str(org.health/org.maxHealth))
 		healthOK = (org.health / org.maxHealth) > 0.6
-		ageOK = org.age < self.age
+		#ageOK = org.age < self.age
+		ageOK = True
 		return healthOK and ageOK
 
 	def update(self):
@@ -382,6 +383,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 				# collision. move away for now.
 				print("these are their ages " + str(self.age) + " " + str(org.age))
 				if self.canMate() and self.shouldMate(org):
+					print("mating" + str(self.id) + " " + str(org.id))
 					generator.addToBeBornBaby(self, org)
 				self.rect.x += -6 * self.velX
 				self.rect.y += -6 * self.velY
