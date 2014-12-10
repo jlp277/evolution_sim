@@ -17,7 +17,7 @@ BLUE	 = (   0,   0, 255)
 pygame.init()
  
 # Set the width and height of the screen [width, height]
-screensize = (700, 500)
+screensize = (1000, 1000)
 screen = pygame.display.set_mode(screensize)
  
 pygame.display.set_caption("evolution")
@@ -35,23 +35,25 @@ habCond = Condition(habLock)
 
 orgSize = 5.0
 vegSize = 15.0
-initOrgPop = 20
-initVegPop = 50
+initOrgPop = 150
+initVegPop = 400
 initOrgHealth = 100.0
-naturalHealthDec = 0.5
+naturalHealthDec = 0.2
 naturalQuantityDec = 0.5
 initVegQuantity = 50.0
 vegId = 0
 orgId = 0
-preyHealthFromVeg = 10.0
-predHealthFromVeg = 2.0
-healthFromPrey = 100.0
+preyHealthFromVeg = 11.0
+predHealthFromVeg = 5.0
+healthFromPrey = 18.0
 nature = ["pred", "prey"]
 eyeDist = 15
 eyeSep = 1
 viewDist = 50.0
 eyeMult = 1.5
 eyeSense = 0.0005
+
+friendDist = 15.0
 
 mutationPr = 0.03
 mutationSvr = 0.5
@@ -116,7 +118,7 @@ class VeggieGenerator(Thread):
 	def run(self):
 		global vegId
 		while True:
-			time.sleep(0.25)
+			time.sleep(0.05)
 			x = random.randrange(screensize[0])
 			y = random.randrange(screensize[1])
 			veg = Veg(vegId, x, y, initVegQuantity, self.habitat)
@@ -168,8 +170,8 @@ class OrganismGenerator(Thread):
 	def __init__(self, habitat):
 		Thread.__init__(self)
 		self.habitat = habitat
-		self.initializeOrgPop()
 		self.babyQueue = []
+		self.initializeOrgPop()
 		
 	def initializeOrgPop(self):
 		global orgId
@@ -187,8 +189,8 @@ class OrganismGenerator(Thread):
 		global orgId
 		parent1Genes = parent1.brain.params
 		parent2Genes = parent2.brain.params
-		print(len(parent1Genes))
-		print(len(parent2Genes))
+		# print(len(parent1Genes))
+		# print(len(parent2Genes))
 
 		crossover = random.randrange(len(parent1Genes))
 		newGenes = parent1Genes.tolist()[:crossover] + parent2Genes.tolist()[crossover:]
@@ -210,13 +212,13 @@ class OrganismGenerator(Thread):
 		while True:
 			time.sleep(2)
 			with habLock:
-				if self.babyQueue != []:
+				if not self.babyQueue == []:
 					newBaby = self.babyQueue.pop(0)
 					self.habitat.organisms.add(newBaby)
 					newBaby.start()
 
 			if random.uniform(0,1) <= mutationPr:
-				# mutations introduced to population gene pool via new organisms with random brains
+				# mutations also introduced to population gene pool via new organisms with random brains
 				(x, y) = self.habitat.getUnoccupiedSpace()
 				nat = random.choice(nature)
 				organism = Organism(orgId, 0, x, y, initOrgHealth, nat, self.habitat)
@@ -224,7 +226,7 @@ class OrganismGenerator(Thread):
 				with habLock:
 					self.habitat.organisms.add(organism)
 					orgId += 1
-					print("mutation! %d" % orgId)
+					# print("mutation! %d" % orgId)
 
 class Organism(pygame.sprite.Sprite, Thread):
 	def __init__(self, id, generation, initX, initY, maxHealth, nature, habitat):
@@ -340,10 +342,10 @@ class Organism(pygame.sprite.Sprite, Thread):
 				smell = eyeMult * math.exp(-eyeSense * (math.pow(self.eyes[1][0] - veg.rect.center[0],2) + math.pow(self.eyes[1][1] - veg.rect.center[1],2)))
 				rv = [rv[0] + smell * veg.color[0], rv[1] + smell * veg.color[1], rv[2] + smell * veg.color[2]]
 
-			# update closest veggie
-			if distToVeg < minDist:
-				minDist = distToVeg
-				self.closestVeg = veg
+			# # update closest veggie
+			# if distToVeg < minDist:
+			# 	minDist = distToVeg
+			# 	self.closestVeg = veg
 
 		for org in self.habitat.organisms:
 			if org == self:
@@ -351,7 +353,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 			distToOrg = math.sqrt(math.pow(self.rect.center[0] - org.rect.center[0], 2) + math.pow(self.rect.center[1] - org.rect.center[1], 2))
 			# update inputs to brain
 			if distToOrg < viewDist:
-				if org.nature == self.nature:
+				if org.nature == self.nature and distToOrg < friendDist:
 					self.friendsNear += 1
 				smell = eyeMult * math.exp(-eyeSense * (math.pow(self.eyes[0][0] - org.rect.center[0],2) + math.pow(self.eyes[0][1] - org.rect.center[1],2)))
 				lv = [lv[0] + smell * org.indicatorColor[0], lv[1] + smell * org.indicatorColor[1], lv[2] + smell * org.indicatorColor[2]]
@@ -369,12 +371,12 @@ class Organism(pygame.sprite.Sprite, Thread):
 		return org.health * (self.friendsNear if not self.friendsNear == 0 else 1) / (org.friendsNear if not org.friendsNear == 0 else 2)
 
 	def canMate(self):
-		print("can mate?" + str(self.health/self.maxHealth))
+		# print("can mate?" + str(self.health/self.maxHealth))
 		healthOK = (self.health / self.maxHealth) > 0.4
 		return healthOK
 
 	def shouldMate(self, org):
-		print("shouldMate?" + str(org.health/org.maxHealth))
+		# print("shouldMate?" + str(org.health/org.maxHealth))
 		healthOK = (org.health / org.maxHealth) > 0.6
 		#ageOK = org.age < self.age
 		ageOK = True
@@ -389,8 +391,6 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.color = self.getHealthColor()
 		if self.health <= 0:
 			return False # dead
-
-		self.age += 1
 
 		# check eyes
 		self.look()
@@ -411,7 +411,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 					if self.health > self.maxHealth:
 						self.health = self.maxHealth
 				if self.canMate() and self.shouldMate(org):
-					print("mating" + str(self.id) + " " + str(org.id))
+					# print("mating" + str(self.id) + " " + str(org.id))
 					generator.addToBeBornBaby(self, org)
 				self.rect.x += -6 * self.velX
 				self.rect.y += -6 * self.velY
@@ -465,12 +465,12 @@ while not done:
 			org.incrementAge()
 			pygame.draw.rect(screen, org.color, [org.rect.x, org.rect.y, org.rect.width, org.rect.height])
 			pygame.draw.rect(screen, org.indicatorColor, [org.rect.x + org.rect.width, org.rect.y, 2, 2])
-			pygame.draw.circle(screen, BLACK, (org.eyes[0][0], org.eyes[0][1]), 2, 1)
-			pygame.draw.lines(screen, BLACK, False, [org.rect.center, (org.eyes[0][0], org.eyes[0][1])], 1)
-			pygame.draw.circle(screen, BLACK, (org.eyes[1][0], org.eyes[1][1]), 2, 1)
-			pygame.draw.lines(screen, BLACK, False, [org.rect.center, (org.eyes[1][0], org.eyes[1][1])], 1)
-			if org.closestVeg:
-				pygame.draw.lines(screen, GREY, False, [org.rect.center, org.closestVeg.rect.center])
+			# pygame.draw.circle(screen, BLACK, (org.eyes[0][0], org.eyes[0][1]), 2, 1)
+			# pygame.draw.lines(screen, BLACK, False, [org.rect.center, (org.eyes[0][0], org.eyes[0][1])], 1)
+			# pygame.draw.circle(screen, BLACK, (org.eyes[1][0], org.eyes[1][1]), 2, 1)
+			# pygame.draw.lines(screen, BLACK, False, [org.rect.center, (org.eyes[1][0], org.eyes[1][1])], 1)
+			# if org.closestVeg:
+				# pygame.draw.lines(screen, GREY, False, [org.rect.center, org.closestVeg.rect.center])
 			# if org.id == 1:
 			# 	pygame.draw.rect(screen, GREEN, [org.rect.x + org.rect.width, org.rect.y + org.rect.height, 2, 2])
 			# 	pygame.draw.rect(screen, org.leftVision, [0, 0, 20, 20])
@@ -480,7 +480,7 @@ while not done:
 	pygame.display.flip()
  
 	# --- Limit to 10 frames per second
-	clock.tick(20)
+	clock.tick(5)
  
 # Close the window and quit.
 # If you forget this line, the program will 'hang'
