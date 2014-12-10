@@ -36,8 +36,8 @@ habCond = Condition(habLock)
 
 orgSize = 5.0
 vegSize = 15.0
-initOrgPop = 75
-initVegPop = 100
+initOrgPop = 50
+initVegPop = 40
 initOrgHealth = 100.0
 naturalHealthDec = 0.5
 naturalQuantityDec = 0.5
@@ -245,7 +245,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.color = BLACK
 		self.generation = generation
 		self.id = id
-		self.speed = 4
+		self.speed = 2
 		self.iterationsUntilMate = 0
 		self.velX = 0
 		self.velY = 0
@@ -453,9 +453,6 @@ habitat = Habitat()
 habitat.start()
 
 # ----------- OBJECTS -------
-
-
-#containers for the plot
 iteration = 0
 iteration_x_values = []
 maxAge_y_values = []
