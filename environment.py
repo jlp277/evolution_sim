@@ -194,7 +194,7 @@ class OrganismGenerator(Thread):
 		crossover = random.randrange(len(parent1Genes))
 		newGenes = parent1Genes.tolist()[:crossover] + parent2Genes.tolist()[crossover:]
 		if (random.random() < mutationPr):
-			geneToMutateIndex = random.randint(0, len(newGenes))
+			geneToMutateIndex = random.randint(0, (len(newGenes) - 1))
 			newGenes[geneToMutateIndex] += mutationSvr
 		generation = parent1.generation + 1 if parent1.generation > parent2.generation else parent2.generation + 1
 		baby = Organism(orgId, generation, parent1.rect.x, parent1.rect.y, parent1.maxHealth, parent1.nature, self.habitat)
