@@ -119,7 +119,7 @@ class VeggieGenerator(Thread):
 	def run(self):
 		global vegId
 		while True:
-			time.sleep(0.25)
+			time.sleep(0.05)
 			randomFactor = random.uniform(0,1)
 			#randomly
 			if randomFactor > 0.6:
@@ -171,7 +171,7 @@ class Veg(pygame.sprite.Sprite, Thread):
 
 	def run(self):
 		while True:
-			time.sleep(0.05)
+			time.sleep(0.25)
 			with habLock:
 				if not self.update(): # death
 					try:
