@@ -18,7 +18,7 @@ BLUE	 = (   0,   0, 255)
 pygame.init()
  
 # Set the width and height of the screen [width, height]
-screensize = (700, 500)
+screensize = (1000, 1000)
 screen = pygame.display.set_mode(screensize)
  
 pygame.display.set_caption("evolution")
@@ -36,8 +36,8 @@ habCond = Condition(habLock)
 
 orgSize = 5.0
 vegSize = 15.0
-initOrgPop = 30
-initVegPop = 50
+initOrgPop = 50
+initVegPop = 40
 initOrgHealth = 100.0
 naturalHealthDec = 0.5
 naturalQuantityDec = 0.5
@@ -118,8 +118,21 @@ class VeggieGenerator(Thread):
 		global vegId
 		while True:
 			time.sleep(0.25)
-			x = random.randrange(screensize[0])
-			y = random.randrange(screensize[1])
+			randomFactor = random.uniform(0,1)
+			#randomly
+			if randomFactor > 0.6:
+				x = random.randrange(screensize[0])
+				y = random.randrange(screensize[1])
+			#make veggies in one of  two clusters
+			else:
+				secondRandomFactor = random.uniform(0,1)
+				#right cluster
+				if secondRandomFactor < 0.5:
+					x = random.randrange((screensize[0] * 6)/10, (screensize[0] * 8)/10)
+				#left cluster
+				else:
+					x = random.randrange((screensize[0] * 2)/10, (screensize[0] * 4)/10)
+				y = random.randrange((screensize[1] * 3)/10, (screensize[1] * 7)/10)
 			veg = Veg(vegId, x, y, initVegQuantity, self.habitat)
 			veg.start()
 			with habLock:
@@ -188,8 +201,6 @@ class OrganismGenerator(Thread):
 		global orgId
 		parent1Genes = parent1.brain.params
 		parent2Genes = parent2.brain.params
-		# print(len(parent1Genes))
-		# print(len(parent2Genes))
 
 		crossover = random.randrange(len(parent1Genes))
 		newGenes = parent1Genes.tolist()[:crossover] + parent2Genes.tolist()[crossover:]
