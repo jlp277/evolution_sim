@@ -3,6 +3,7 @@ import random
 from threading import *
 import time
 import sys
+import matplotlib.pyplot as plt
 from pybrain.tools.shortcuts import buildNetwork
 import math
 
@@ -35,7 +36,7 @@ habCond = Condition(habLock)
 
 orgSize = 5.0
 vegSize = 15.0
-initOrgPop = 20
+initOrgPop = 30
 initVegPop = 50
 initOrgHealth = 100.0
 naturalHealthDec = 0.5
@@ -187,8 +188,8 @@ class OrganismGenerator(Thread):
 		global orgId
 		parent1Genes = parent1.brain.params
 		parent2Genes = parent2.brain.params
-		print(len(parent1Genes))
-		print(len(parent2Genes))
+		# print(len(parent1Genes))
+		# print(len(parent2Genes))
 
 		crossover = random.randrange(len(parent1Genes))
 		newGenes = parent1Genes.tolist()[:crossover] + parent2Genes.tolist()[crossover:]
@@ -369,15 +370,15 @@ class Organism(pygame.sprite.Sprite, Thread):
 		return org.health * (self.friendsNear if not self.friendsNear == 0 else 1) / (org.friendsNear if not org.friendsNear == 0 else 2)
 
 	def canMate(self):
-		print("can mate?" + str(self.health/self.maxHealth))
+		# print("can mate?" + str(self.health/self.maxHealth))
 		healthOK = (self.health / self.maxHealth) > 0.4
 		return healthOK
 
 	def shouldMate(self, org):
-		print("shouldMate?" + str(org.health/org.maxHealth))
+		# print("shouldMate?" + str(org.health/org.maxHealth))
 		healthOK = (org.health / org.maxHealth) > 0.6
-		#ageOK = org.age < self.age
-		ageOK = True
+		ageOK = org.age < self.age
+		# ageOK = True
 		return healthOK and ageOK
 
 	def update(self):
@@ -413,8 +414,8 @@ class Organism(pygame.sprite.Sprite, Thread):
 				if self.canMate() and self.shouldMate(org):
 					print("mating" + str(self.id) + " " + str(org.id))
 					generator.addToBeBornBaby(self, org)
-				self.rect.x += -6 * self.velX
-				self.rect.y += -6 * self.velY
+				# self.rect.x += -6 * self.velX
+				# self.rect.y += -6 * self.velY
 				break
 
 		# check for "collision" with food. mmm...
@@ -441,6 +442,9 @@ habitat = Habitat()
 habitat.start()
 
 # ----------- OBJECTS -------
+iteration = 0
+iteration_x_values = []
+maxAge_y_values = []
 
 # -------- Main Program Loop -----------
 while not done:
@@ -457,20 +461,33 @@ while not done:
 	# above this, or they will be erased with this command.
 	screen.fill(WHITE)
 
+
+
+	#counter for xvalues
+	
+
 	# draw food
 	with habLock:
+		# print(iteration)
+		iteration_x_values.append(iteration)
 		for veg in habitat.vegs:
 			pygame.draw.rect(screen, veg.color, [veg.rect.x, veg.rect.y, veg.rect.width, veg.rect.height])
+
+		maxAge = 0
 		for org in habitat.organisms:
 			org.incrementAge()
+			if org.age > maxAge:
+				maxAge = org.age
 			pygame.draw.rect(screen, org.color, [org.rect.x, org.rect.y, org.rect.width, org.rect.height])
 			pygame.draw.rect(screen, org.indicatorColor, [org.rect.x + org.rect.width, org.rect.y, 2, 2])
 			pygame.draw.circle(screen, BLACK, (org.eyes[0][0], org.eyes[0][1]), 2, 1)
 			pygame.draw.lines(screen, BLACK, False, [org.rect.center, (org.eyes[0][0], org.eyes[0][1])], 1)
 			pygame.draw.circle(screen, BLACK, (org.eyes[1][0], org.eyes[1][1]), 2, 1)
 			pygame.draw.lines(screen, BLACK, False, [org.rect.center, (org.eyes[1][0], org.eyes[1][1])], 1)
-			if org.closestVeg:
-				pygame.draw.lines(screen, GREY, False, [org.rect.center, org.closestVeg.rect.center])
+			# if org.closestVeg:
+			# 	pygame.draw.lines(screen, GREY, False, [org.rect.center, org.closestVeg.rect.center])
+		maxAge_y_values.append(maxAge)
+		iteration += 1
 			# if org.id == 1:
 			# 	pygame.draw.rect(screen, GREEN, [org.rect.x + org.rect.width, org.rect.y + org.rect.height, 2, 2])
 			# 	pygame.draw.rect(screen, org.leftVision, [0, 0, 20, 20])
