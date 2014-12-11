@@ -36,25 +36,25 @@ habCond = Condition(habLock)
 
 orgSize = 5.0
 vegSize = 15.0
-initOrgPop = 50
-initVegPop = 40
+initOrgPop = 200
+initVegPop = 250
 initOrgHealth = 100.0
-naturalHealthDec = 0.5
-naturalQuantityDec = 0.5
-initVegQuantity = 50.0
+naturalHealthDec = 0.3
+naturalQuantityDec = 0.3
+initVegQuantity = 75.0
 vegId = 0
 orgId = 0
 preyHealthFromVeg = 10.0
-predHealthFromVeg = 2.0
-healthFromPrey = 100.0
+predHealthFromVeg = 1.0
+healthFromPrey = 15.0
 nature = ["pred", "prey"]
 eyeDist = 15
 eyeSep = 1
-viewDist = 50.0
+viewDist = 100.0
 eyeMult = 1.5
 eyeSense = 0.0005
 
-mutationPr = 0.03
+mutationPr = 0.05
 mutationSvr = 0.5
 
 generator = None
@@ -117,7 +117,7 @@ class VeggieGenerator(Thread):
 	def run(self):
 		global vegId
 		while True:
-			time.sleep(0.25)
+			time.sleep(0.05)
 			randomFactor = random.uniform(0,1)
 			#randomly
 			if randomFactor > 0.6:
@@ -267,6 +267,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.friendsNear = 0
 		self.orient()
 		self.age = 0
+		self.lastMated = 0
 		
 		self.closestVeg = None
 		self.look()
@@ -388,7 +389,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 	def shouldMate(self, org):
 		# print("shouldMate?" + str(org.health/org.maxHealth))
 		healthOK = (org.health / org.maxHealth) > 0.6
-		ageOK = org.age < self.age
+		ageOK = org.age < self.age and self.age - self.lastMated > 30
 		# ageOK = True
 		return healthOK and ageOK
 
@@ -425,6 +426,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 				if self.canMate() and self.shouldMate(org):
 					print("mating" + str(self.id) + " " + str(org.id))
 					generator.addToBeBornBaby(self, org)
+					self.lastMated = self.age
 				# self.rect.x += -6 * self.velX
 				# self.rect.y += -6 * self.velY
 				break
@@ -456,6 +458,8 @@ habitat.start()
 iteration = 0
 iteration_x_values = []
 maxAge_y_values = []
+pred_population = []
+prey_population = []
 
 # -------- Main Program Loop -----------
 while not done:
@@ -485,6 +489,8 @@ while not done:
 			pygame.draw.rect(screen, veg.color, [veg.rect.x, veg.rect.y, veg.rect.width, veg.rect.height])
 
 		maxAge = 0
+		numPred = 0
+		numPrey = 0
 		for org in habitat.organisms:
 			org.incrementAge()
 			if org.age > maxAge:
@@ -497,7 +503,14 @@ while not done:
 			pygame.draw.lines(screen, BLACK, False, [org.rect.center, (org.eyes[1][0], org.eyes[1][1])], 1)
 			# if org.closestVeg:
 			# 	pygame.draw.lines(screen, GREY, False, [org.rect.center, org.closestVeg.rect.center])
+			if org.nature == "prey":
+				numPrey += 1
+			else:
+				numPred += 1
+
 		maxAge_y_values.append(maxAge)
+		pred_population.append(numPred)
+		prey_population.append(numPrey)
 		iteration += 1
 			# if org.id == 1:
 			# 	pygame.draw.rect(screen, GREEN, [org.rect.x + org.rect.width, org.rect.y + org.rect.height, 2, 2])
@@ -514,7 +527,10 @@ while not done:
 # If you forget this line, the program will 'hang'
 # on exit if running from IDLE.
 pygame.quit()
-plt.plot(iteration_x_values, maxAge_y_values)
-plt.xlabel('Iteration')
-plt.ylabel('Max Age')
+# plt.plot(iteration_x_values, maxAge_y_values)
+# plt.xlabel('Iteration')
+# plt.ylabel('Max Age')
+# plt.show()
+
+plt.plot(iteration_x_values, pred_population, 'r', prey_population, 'b')
 plt.show()
