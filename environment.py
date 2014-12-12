@@ -5,6 +5,7 @@ import time
 import sys
 import matplotlib.pyplot as plt
 from pybrain.tools.shortcuts import buildNetwork
+from pybrain.structure import LinearLayer
 import math
 
 # Define some colors
@@ -46,7 +47,7 @@ vegId = 0
 orgId = 0
 preyHealthFromVeg = 10.0
 predHealthFromVeg = 1.0
-healthFromPrey = 15.0
+healthFromPrey = 10.0
 nature = ["pred", "prey"]
 eyeDist = 15
 eyeSep = 1
@@ -117,7 +118,7 @@ class VeggieGenerator(Thread):
 	def run(self):
 		global vegId
 		while True:
-			time.sleep(0.05)
+			time.sleep(0.25)
 			randomFactor = random.uniform(0,1)
 			#randomly
 			if randomFactor > 0.6:
@@ -129,7 +130,7 @@ class VeggieGenerator(Thread):
 				#right cluster
 				if secondRandomFactor < 0.5:
 					x = random.randrange((screensize[0] * 6)/10, (screensize[0] * 8)/10)
-				#left cluster
+				# #left cluster
 				else:
 					x = random.randrange((screensize[0] * 2)/10, (screensize[0] * 4)/10)
 				y = random.randrange((screensize[1] * 3)/10, (screensize[1] * 7)/10)
@@ -261,7 +262,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.rect.y = initY
 		self.age = 0
 		self.eyes = None
-		self.brain = buildNetwork(8,4,2)
+		self.brain = buildNetwork(8,1,2, hiddenclass = LinearLayer)
 		self.leftVision = (0, 0, 0)
 		self.rightVision = (0, 0, 0)
 		self.friendsNear = 0
@@ -297,13 +298,14 @@ class Organism(pygame.sprite.Sprite, Thread):
 
 		outputs = self.brain.activate(inputs)
 		lrDiff = outputs[0] - outputs[1]
+		lrDiff = lrDiff / 10000.0 #normalize
 
-		if math.fabs(lrDiff) < 0.1:
+		if math.fabs(lrDiff) < 0.01:
 			pass
 		elif lrDiff < 0:
-			self.orientation -= 0.05
+			self.orientation -= lrDiff
 		else:
-			self.orientation += 0.05
+			self.orientation += lrDiff
 
 		#self.orientation = random.uniform(0, 2 * math.pi)
 		self.speed = random.uniform(0,3)
@@ -344,7 +346,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 		minDist = 9999.0
 		lv = [0,0,0]
 		rv = [0,0,0]
-		self.friendsNear = 0
+		self.friendsNear = 0.0
 		for veg in self.habitat.vegs:
 			distToVeg = math.sqrt(math.pow(self.rect.center[0] - veg.rect.center[0], 2) + math.pow(self.rect.center[1] - veg.rect.center[1], 2))
 			if distToVeg < viewDist:
@@ -379,7 +381,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 		return natureOK
 
 	def healthGained(self, org):
-		return org.health * (self.friendsNear if not self.friendsNear == 0 else 1) / (org.friendsNear if not org.friendsNear == 0 else 2)
+		return org.health * (self.friendsNear if not self.friendsNear == 0.0 else 1.0) / (org.friendsNear if not org.friendsNear == 0.0 else 2.0)
 
 	def canMate(self):
 		# print("can mate?" + str(self.health/self.maxHealth))
@@ -388,8 +390,8 @@ class Organism(pygame.sprite.Sprite, Thread):
 
 	def shouldMate(self, org):
 		# print("shouldMate?" + str(org.health/org.maxHealth))
-		healthOK = (org.health / org.maxHealth) > 0.6
-		ageOK = org.age < self.age and self.age - self.lastMated > 30
+		healthOK = (org.health / org.maxHealth) > 0.8
+		ageOK = org.age < self.age and self.age - self.lastMated > 300
 		# ageOK = True
 		return healthOK and ageOK
 
@@ -423,12 +425,13 @@ class Organism(pygame.sprite.Sprite, Thread):
 					self.health += healthTrans
 					if self.health > self.maxHealth:
 						self.health = self.maxHealth
-				if self.canMate() and self.shouldMate(org):
+				if self.canMate() and self.shouldMate(org) and org.canMate() and org.shouldMate(self):
 					print("mating" + str(self.id) + " " + str(org.id))
 					generator.addToBeBornBaby(self, org)
 					self.lastMated = self.age
-				# self.rect.x += -6 * self.velX
-				# self.rect.y += -6 * self.velY
+					org.lastMated = org.age
+					self.rect.x += -6 * self.velX
+					self.rect.y += -6 * self.velY
 				break
 
 		# check for "collision" with food. mmm...
