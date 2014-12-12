@@ -5,7 +5,7 @@ import time
 import sys
 import matplotlib.pyplot as plt
 from pybrain.tools.shortcuts import buildNetwork
-from pybrain.structure import LinearLayer
+from pybrain.structure import SigmoidLayer
 import math
 
 # Define some colors
@@ -19,7 +19,7 @@ BLUE	 = (   0,   0, 255)
 pygame.init()
  
 # Set the width and height of the screen [width, height]
-screensize = (1000, 1000)
+screensize = (500, 500)
 screen = pygame.display.set_mode(screensize)
  
 pygame.display.set_caption("evolution")
@@ -35,10 +35,11 @@ clock = pygame.time.Clock()
 habLock = Lock()
 habCond = Condition(habLock)
 
+vegFreq = 0.25
 orgSize = 5.0
 vegSize = 15.0
-initOrgPop = 200
-initVegPop = 250
+initOrgPop = 100
+initVegPop = 150
 initOrgHealth = 100.0
 naturalHealthDec = 0.3
 naturalQuantityDec = 0.3
@@ -51,7 +52,7 @@ healthFromPrey = 10.0
 nature = ["pred", "prey"]
 eyeDist = 15
 eyeSep = 1
-viewDist = 100.0
+viewDist = 500.0
 eyeMult = 1.5
 eyeSense = 0.0005
 
@@ -118,7 +119,7 @@ class VeggieGenerator(Thread):
 	def run(self):
 		global vegId
 		while True:
-			time.sleep(0.25)
+			time.sleep(vegFreq)
 			randomFactor = random.uniform(0,1)
 			#randomly
 			if randomFactor > 0.6:
@@ -207,7 +208,7 @@ class OrganismGenerator(Thread):
 		newGenes = parent1Genes.tolist()[:crossover] + parent2Genes.tolist()[crossover:]
 		if (random.random() < mutationPr):
 			geneToMutateIndex = random.randint(0, (len(newGenes) - 1))
-			newGenes[geneToMutateIndex] += mutationSvr
+			newGenes[geneToMutateIndex] = random.uniform(0,1)
 		generation = parent1.generation + 1 if parent1.generation > parent2.generation else parent2.generation + 1
 		baby = Organism(orgId, generation, parent1.rect.x, parent1.rect.y, parent1.maxHealth, parent1.nature, self.habitat)
 		baby.brain._setParameters(newGenes)
@@ -262,7 +263,8 @@ class Organism(pygame.sprite.Sprite, Thread):
 		self.rect.y = initY
 		self.age = 0
 		self.eyes = None
-		self.brain = buildNetwork(8,1,2, hiddenclass = LinearLayer)
+		self.brain = buildNetwork(7,4,2, hiddenclass = SigmoidLayer)
+		self.brain.randomize()
 		self.leftVision = (0, 0, 0)
 		self.rightVision = (0, 0, 0)
 		self.friendsNear = 0
@@ -289,26 +291,25 @@ class Organism(pygame.sprite.Sprite, Thread):
 		# random for now
 		# if self.age % 2 == 0: # for now, make changing directions based on age,
 		inputs = []
+		leftVisionSum = math.fsum(self.leftVision) if not math.fsum(self.leftVision) == 0 else 1.0 
+		rightVisionSum = math.fsum(self.rightVision) if not math.fsum(self.leftVision) == 0 else 1.0
 		for color in self.leftVision:
-			inputs.append(color)
+			inputs.append(color / leftVisionSum)
 		for color in self.rightVision:
-			inputs.append(color)
-		inputs.extend([1,1]) # bias neurons
-		# print(inputs)
+			inputs.append(color / rightVisionSum)
+		inputs.extend([1.0]) # bias neurons
+		# print(str(inputs))
 
 		outputs = self.brain.activate(inputs)
-		lrDiff = outputs[0] - outputs[1]
-		lrDiff = lrDiff / 10000.0 #normalize
+		# print(str(outputs))
+		# lrDiff = outputs[0] - outputs[1]
+		# lrDiff = lrDiff / 100.0 #normalize
+		# print(lrDiff)
 
-		if math.fabs(lrDiff) < 0.01:
-			pass
-		elif lrDiff < 0:
-			self.orientation -= lrDiff
-		else:
-			self.orientation += lrDiff
-
+		self.orientation += (outputs[0] / 6.0)
+		# print(str(outputs))
 		#self.orientation = random.uniform(0, 2 * math.pi)
-		self.speed = random.uniform(0,3)
+		self.speed = math.fabs(outputs[1])
 
 		# body stays stationary and moves in orientation and velocity
 		# calculate position of eyes (two points)
@@ -390,8 +391,8 @@ class Organism(pygame.sprite.Sprite, Thread):
 
 	def shouldMate(self, org):
 		# print("shouldMate?" + str(org.health/org.maxHealth))
-		healthOK = (org.health / org.maxHealth) > 0.8
-		ageOK = org.age < self.age and self.age - self.lastMated > 300
+		healthOK = (org.health / org.maxHealth) > 0.4
+		ageOK = (self.age - self.lastMated) > 300
 		# ageOK = True
 		return healthOK and ageOK
 
@@ -405,7 +406,6 @@ class Organism(pygame.sprite.Sprite, Thread):
 		if self.health <= 0:
 			return False # dead
 
-		self.age += 1
 
 		# check eyes
 		self.look()
@@ -425,7 +425,7 @@ class Organism(pygame.sprite.Sprite, Thread):
 					self.health += healthTrans
 					if self.health > self.maxHealth:
 						self.health = self.maxHealth
-				if self.canMate() and self.shouldMate(org) and org.canMate() and org.shouldMate(self):
+				if self.shouldMate(org) and org.shouldMate(self):
 					print("mating" + str(self.id) + " " + str(org.id))
 					generator.addToBeBornBaby(self, org)
 					self.lastMated = self.age
